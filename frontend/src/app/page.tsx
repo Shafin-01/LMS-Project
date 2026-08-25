@@ -1,4 +1,5 @@
 import { fetchAPI } from "@/lib/api";
+import Link from "next/link";
 
 interface Course {
   id: number;
@@ -53,7 +54,7 @@ export default async function Home() {
                 descText = course.Description;
               } else if (Array.isArray(course.Description)) {
                 // যদি blocks অ্যারে হয়
-                descText = course.Description.map((item: any) => 
+                descText = course.Description.map((item: any) =>
                   item.children?.map((c: any) => c.text).join("")
                 ).join(" ");
               } else if (typeof course.Description === "object" && course.Description !== null) {
@@ -73,11 +74,14 @@ export default async function Home() {
                       {descText}
                     </p>
                   </div>
-                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-                    <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
+                  <Link
+                    href={`/courses/${course.documentId || course.id}`}
+                    className="pt-4 border-t border-slate-100 dark:border-slate-800 block"
+                  >
+                    <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
                       View Course →
                     </span>
-                  </div>
+                  </Link>
                 </div>
               );
             })}
