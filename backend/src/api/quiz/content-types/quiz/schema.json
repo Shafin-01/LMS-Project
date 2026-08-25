@@ -1,0 +1,39 @@
+{
+  "kind": "collectionType",
+  "collectionName": "quizzes",
+  "info": {
+    "singularName": "quiz",
+    "pluralName": "quizzes",
+    "displayName": "Quiz"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "Question": {
+      "type": "string"
+    },
+    "OptionA": {
+      "type": "string"
+    },
+    "OptionB": {
+      "type": "string"
+    },
+    "OptionC": {
+      "type": "string"
+    },
+    "OptionD": {
+      "type": "string"
+    },
+    "CorrectAnswer": {
+      "type": "string"
+    },
+    "lesson": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::lesson.lesson",
+      "inversedBy": "quizzes"
+    }
+  }
+}
