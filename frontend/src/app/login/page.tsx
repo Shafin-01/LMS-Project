@@ -21,16 +21,18 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          identifier,
-          password,
+          identifier: identifier.trim(), // ইউজারনেম বা ইমেল যেন কোনো এক্সট্রা স্পেস না টানে
+          password: password,
         }),
       });
 
       const data = await res.json();
+      console.log("Server Response Details:", JSON.stringify(data, null, 2));
 
       if (!res.ok) {
         throw new Error(data.error?.message || "Invalid credentials");
       }
+
 
       localStorage.setItem("jwt", data.jwt);
       localStorage.setItem("user", JSON.stringify(data.user));
