@@ -17,7 +17,12 @@ const config: Core.Config.Middlewares = [
       },
     },
   },
-  'strapi::cors',
+  {
+    name: 'strapi::cors',
+    config: {
+      origin: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(','),
+    },
+  },
   'strapi::poweredBy',
   'strapi::query',
   'strapi::body',
