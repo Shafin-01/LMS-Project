@@ -15,7 +15,6 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // এখানে সরাসরি API_URL বা এনভায়রনমেন্ট ভেরিয়েবল ব্যবহার করতে হবে
       const baseUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL || "http://localhost:1337";
       
       const res = await fetch(`${baseUrl}/api/auth/local`, {
