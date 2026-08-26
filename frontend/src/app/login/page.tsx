@@ -15,13 +15,16 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const res = await fetch("https://lms-project-production-d789.up.railway.app/api/auth/local", {
+      // এখানে সরাসরি API_URL বা এনভায়রনমেন্ট ভেরিয়েবল ব্যবহার করতে হবে
+      const baseUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL || "http://localhost:1337";
+      
+      const res = await fetch(`${baseUrl}/api/auth/local`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          identifier: identifier.trim(), // ইউজারনেম বা ইমেল যেন কোনো এক্সট্রা স্পেস না টানে
+          identifier: identifier.trim(),
           password: password,
         }),
       });
