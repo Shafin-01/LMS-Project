@@ -59,6 +59,7 @@ export async function fetchAPI<T = unknown>(
   }
 
   const response = await fetch(requestUrl, {
+    cache: "no-store",
     ...init,
     headers: {
       ...defaultHeaders,
