@@ -15,7 +15,9 @@ export default function LoginPage() {
         setError("");
 
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL || "http://localhost:1337";
+            const baseUrl =
+                process.env.NEXT_PUBLIC_STRAPI_API_URL ||
+                "http://localhost:1337";
 
             const res = await fetch(`${baseUrl}/api/auth/local`, {
                 method: "POST",
@@ -24,28 +26,46 @@ export default function LoginPage() {
                 },
                 body: JSON.stringify({
                     identifier: identifier.trim(),
-                    password: password,
+                    password,
                 }),
             });
 
             const data = await res.json();
-            console.log("Server Response Details:", JSON.stringify(data, null, 2));
 
             if (!res.ok) {
-                throw new Error(data.error?.message || "Invalid credentials");
+                throw new Error(
+                    data.error?.message || "Invalid credentials"
+                );
             }
 
-            const meRes = await fetch(`${baseUrl}/api/users/me?populate=role`, {
-                headers: { Authorization: `Bearer ${data.jwt}` },
-            });
+            const meRes = await fetch(
+                `${baseUrl}/api/users/me?populate=role`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${data.jwt}`,
+                    },
+                }
+            );
+
+            if (!meRes.ok) {
+                throw new Error(
+                    "User information load করা যায়নি।"
+                );
+            }
+
             const fullUser = await meRes.json();
 
             localStorage.setItem("jwt", data.jwt);
-            localStorage.setItem("user", JSON.stringify(fullUser));
+            localStorage.setItem(
+                "user",
+                JSON.stringify(fullUser)
+            );
 
             router.push("/");
         } catch (err: any) {
-            setError(err.message);
+            setError(
+                err?.message || "Login করা যায়নি।"
+            );
         }
     };
 
@@ -53,8 +73,13 @@ export default function LoginPage() {
         <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
             <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-xl space-y-6">
                 <div className="text-center space-y-2">
-                    <h2 className="text-2xl font-bold text-white">Welcome Back</h2>
-                    <p className="text-sm text-slate-400">Sign in to your LMS account</p>
+                    <h2 className="text-2xl font-bold text-white">
+                        Welcome Back
+                    </h2>
+
+                    <p className="text-sm text-slate-400">
+                        Sign in to your LMS account
+                    </p>
                 </div>
 
                 {error && (
@@ -63,29 +88,44 @@ export default function LoginPage() {
                     </div>
                 )}
 
-                <form onSubmit={handleLogin} className="space-y-4">
+                <form
+                    onSubmit={handleLogin}
+                    className="space-y-4"
+                >
                     <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Email or Username</label>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">
+                            Email or Username
+                        </label>
+
                         <input
                             type="text"
                             value={identifier}
-                            onChange={(e) => setIdentifier(e.target.value)}
+                            onChange={(e) =>
+                                setIdentifier(e.target.value)
+                            }
                             required
                             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
                             placeholder="name@example.com"
                         />
                     </div>
+
                     <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">
+                            Password
+                        </label>
+
                         <input
                             type="password"
                             value={password}
-                            onChange={(e) => setPassword(e.target.value)}
+                            onChange={(e) =>
+                                setPassword(e.target.value)
+                            }
                             required
                             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
                             placeholder="••••••••"
                         />
                     </div>
+
                     <button
                         type="submit"
                         className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-lg transition-colors shadow-lg shadow-indigo-600/30"
@@ -96,7 +136,10 @@ export default function LoginPage() {
 
                 <p className="text-center text-sm text-slate-400">
                     Don't have an account?{" "}
-                    <Link href="/register" className="text-indigo-400 hover:underline">
+                    <Link
+                        href="/register"
+                        className="text-indigo-400 hover:underline"
+                    >
                         Sign Up
                     </Link>
                 </p>
