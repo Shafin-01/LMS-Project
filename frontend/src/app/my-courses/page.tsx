@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 interface Enrollment {
   id: number;
+  documentId: string;   
   course: { id: number; documentId: string; Title: string };
 }
 
@@ -15,18 +16,20 @@ export default function MyCoursesPage() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    const user = getUser();
-    if (!user) {
-      router.push("/login");
-      return;
-    }
+useEffect(() => {
+  const user = getUser();
+  if (!user) {
+    router.push("/login");
+    return;
+  }
 
-    authFetch(`/enrollments?filters[student][id][$eq]=${user.id}&populate=course`)
-      .then((res) => setEnrollments(res.data || []))
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
-  }, [router]);
+  // 🔧 আগে: authFetch(`/enrollments?filters[student][id][$eq]=${user.id}&populate=course`)
+  // এখন: নিজের নতুন secure endpoint ব্যবহার করছি, generic find permission লাগবে না
+  authFetch(`/enrollments/my-enrollments`)
+    .then((res) => setEnrollments(res.data || []))
+    .catch((err) => console.error(err))
+    .finally(() => setLoading(false));
+}, [router]);
 
   if (loading) return <p className="text-center text-slate-400 py-20">Loading...</p>;
 
@@ -42,7 +45,7 @@ export default function MyCoursesPage() {
             {enrollments.map((enr) => (
               <Link
                 key={enr.id}
-                href={`/courses/${enr.course.documentId || enr.course.id}?enrollmentId=${enr.id}`}
+                href={`/courses/${enr.course.documentId || enr.course.id}?enrollmentId=${enr.documentId}`}
                 className="block bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-indigo-500 transition-colors"
               >
                 <h3 className="text-lg font-semibold text-white">{enr.course.Title}</h3>

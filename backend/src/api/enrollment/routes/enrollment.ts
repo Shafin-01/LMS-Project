@@ -8,6 +8,18 @@ const customRoutes = [
     config: { policies: [] },
   },
   {
+    method: 'GET',
+    path: '/enrollments/my-enrollments',
+    handler: 'enrollment.myEnrollments',
+    config: { policies: [] },
+  },
+  {
+    method: 'GET',
+    path: '/enrollments/my-enrollment/:courseId',
+    handler: 'enrollment.myEnrollmentForCourse',
+    config: { policies: [] },
+  },
+  {
     method: 'POST',
     path: '/enrollments/:id/complete-lesson',
     handler: 'enrollment.completeLesson',
@@ -28,7 +40,9 @@ const customRouter = (innerRouter: any, extraRoutes: any[] = []) => {
   return {
     get routes() {
       if (!routes) {
-        routes = innerRouter.routes.concat(extraRoutes);
+        // 🔧 আগে ছিল innerRouter.routes.concat(extraRoutes) — default route আগে match হতো,
+        // যেটা /enrollments/my-enrollments কে /enrollments/:id ভেবে ধরে নিত। এখন custom route আগে।
+        routes = extraRoutes.concat(innerRouter.routes);
       }
       return routes;
     },

@@ -16,7 +16,7 @@ const customRouter = (innerRouter: any, extraRoutes: any[] = []) => {
   return {
     get routes() {
       if (!routes) {
-        routes = innerRouter.routes.concat(extraRoutes);
+        routes = extraRoutes.concat(innerRouter.routes);
       }
       return routes;
     },
