@@ -7,12 +7,22 @@ const customRoutes = [
     handler: 'enrollment.enroll',
     config: { policies: [] },
   },
+  {
+    method: 'POST',
+    path: '/enrollments/:id/complete-lesson',
+    handler: 'enrollment.completeLesson',
+    config: { policies: [] },
+  },
+  {
+    method: 'GET',
+    path: '/enrollments/:id/progress',
+    handler: 'enrollment.getProgress',
+    config: { policies: [] },
+  },
 ];
 
 const defaultRouter = factories.createCoreRouter('api::enrollment.enrollment');
 
-// Strapi এর recommended pattern — .routes কে "lazy getter" হিসেবে রাখা,
-// যাতে Strapi নিজে যখন দরকার তখনই এটা পড়ে, module load হওয়ার সাথে সাথেই না।
 const customRouter = (innerRouter: any, extraRoutes: any[] = []) => {
   let routes: any[];
   return {
