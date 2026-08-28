@@ -36,8 +36,13 @@ export default function RegisterPage() {
                 throw new Error(data.error?.message || "Registration failed");
             }
 
+            const meRes = await fetch(`${baseUrl}/api/users/me?populate=role`, {
+                headers: { Authorization: `Bearer ${data.jwt}` },
+            });
+            const fullUser = await meRes.json();
+
             localStorage.setItem("jwt", data.jwt);
-            localStorage.setItem("user", JSON.stringify(data.user));
+            localStorage.setItem("user", JSON.stringify(fullUser));
 
             router.push("/");
         } catch (err: any) {
