@@ -28,6 +28,9 @@
       "relation": "oneToMany",
       "target": "api::quiz.quiz",
       "mappedBy": "lesson"
+    },
+    "Content": {
+      "type": "text"
     }
   }
 }
