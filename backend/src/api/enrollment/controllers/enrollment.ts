@@ -1,122 +1,348 @@
 import { factories } from '@strapi/strapi';
 
-export default factories.createCoreController('api::enrollment.enrollment', ({ strapi }) => ({
+export default factories.createCoreController(
+  'api::enrollment.enrollment',
+  ({ strapi }) => ({
 
-  async enroll(ctx) {
-    const user = ctx.state.user;
-    if (!user) return ctx.unauthorized('Login করা লাগবে enroll করার জন্য।');
+    async enroll(ctx) {
+      const user = ctx.state.user;
 
-    const { courseId } = ctx.request.body; // course এর documentId
-    if (!courseId) return ctx.badRequest('courseId দিতে হবে।');
+      if (!user) {
+        return ctx.unauthorized(
+          'Login করা লাগবে enroll করার জন্য।'
+        );
+      }
 
-    const course = await strapi.documents('api::course.course').findOne({
-      documentId: courseId,
-    });
-    if (!course) return ctx.notFound('Course পাওয়া যায়নি।');
+      if (user.role?.name !== 'Student') {
+        return ctx.forbidden(
+          'শুধুমাত্র Student course-এ enroll করতে পারবে।'
+        );
+      }
 
-    const existing = await strapi.db.query('api::enrollment.enrollment').findOne({
-      where: { student: user.id, course: course.id },
-    });
+      const { courseId } = ctx.request.body || {};
 
-    if (existing) return ctx.badRequest('তুমি আগে থেকেই এই course এ enroll করা আছো।');
+      if (!courseId || typeof courseId !== 'string') {
+        return ctx.badRequest(
+          'Valid courseId দিতে হবে।'
+        );
+      }
 
-    const enrollment = await strapi.documents('api::enrollment.enrollment').create({
-      data: {
-        student: user.id,
-        course: course.id,
-        enrolledAt: new Date(),
-      },
-    });
+      const course = await strapi
+        .documents('api::course.course')
+        .findOne({
+          documentId: courseId,
+        });
 
-    return { data: enrollment };
-  },
+      if (!course) {
+        return ctx.notFound(
+          'Course পাওয়া যায়নি।'
+        );
+      }
 
-  // 🔧 নতুন — logged-in student এর সব enrollment (course populate সহ)। My Courses page এখন এটাই ব্যবহার করবে।
-  // generic `find` permission লাগবে না — শুধু নিজের ডেটা, ctx.state.user থেকেই ধরা হচ্ছে।
-  async myEnrollments(ctx) {
-    const user = ctx.state.user;
-    if (!user) return ctx.unauthorized('Login করা লাগবে।');
+      if (!course.publishedAt) {
+        return ctx.badRequest(
+          'এই course এখনো published হয়নি।'
+        );
+      }
 
-    const enrollments = await strapi.documents('api::enrollment.enrollment').findMany({
-      filters: { student: { id: user.id } },
-      populate: ['course'],
-    });
+      const existingEnrollments = await strapi
+        .documents('api::enrollment.enrollment')
+        .findMany({
+          filters: {
+            course: {
+              documentId: {
+                $eq: course.documentId,
+              },
+            },
+            student: {
+              id: {
+                $eq: user.id,
+              },
+            },
+          },
+        });
 
-    return { data: enrollments };
-  },
+      if (existingEnrollments.length > 0) {
+        return ctx.badRequest(
+          'তুমি আগে থেকেই এই course-এ enroll করা আছো।'
+        );
+      }
 
-  // 🔧 নতুন — একটা নির্দিষ্ট course-এ logged-in student এর enrollment আছে কিনা (থাকলে সেটা রিটার্ন করে)।
-  // Lesson page যখন URL-এ enrollmentId পায় না, তখন এটা কল করে।
-  async myEnrollmentForCourse(ctx) {
-    const user = ctx.state.user;
-    if (!user) return ctx.unauthorized('Login করা লাগবে।');
+      const enrollment = await strapi
+        .documents('api::enrollment.enrollment')
+        .create({
+          data: {
+            student: user.id,
+            course: course.id,
+            enrolledAt: new Date(),
+          },
+        });
 
-    const { courseId } = ctx.params; // course এর documentId
+      return {
+        data: enrollment,
+      };
+    },
 
-    const course = await strapi.documents('api::course.course').findOne({
-      documentId: courseId,
-    });
-    if (!course) return ctx.notFound('Course পাওয়া যায়নি।');
+    async myEnrollments(ctx) {
+      const user = ctx.state.user;
 
-    const enrollment = await strapi.db.query('api::enrollment.enrollment').findOne({
-      where: { student: user.id, course: course.id },
-    });
+      if (!user) {
+        return ctx.unauthorized(
+          'Login করা লাগবে।'
+        );
+      }
 
-    return { data: enrollment || null };
-  },
+      if (user.role?.name !== 'Student') {
+        return ctx.forbidden(
+          'শুধুমাত্র Student নিজের enrollments দেখতে পারবে।'
+        );
+      }
 
-  async completeLesson(ctx) {
-    const user = ctx.state.user;
-    const { id } = ctx.params; // enrollment এর documentId
-    const { lessonId } = ctx.request.body; // lesson এর documentId
+      const enrollments = await strapi
+        .documents('api::enrollment.enrollment')
+        .findMany({
+          filters: {
+            student: {
+              id: {
+                $eq: user.id,
+              },
+            },
+          },
+          populate: ['course'],
+        });
 
-    const enrollment = await strapi.documents('api::enrollment.enrollment').findOne({
-      documentId: id,
-      populate: ['student', 'completedLessons'],
-    });
+      return {
+        data: enrollments,
+      };
+    },
 
-    if (!enrollment) return ctx.notFound('Enrollment পাওয়া যায়নি।');
-    if (enrollment.student?.id !== user.id) return ctx.forbidden('এটা তোমার enrollment না।');
+    async myEnrollmentForCourse(ctx) {
+      const user = ctx.state.user;
 
-    const lesson = await strapi.documents('api::lesson.lesson').findOne({
-      documentId: lessonId,
-    });
-    if (!lesson) return ctx.notFound('Lesson পাওয়া যায়নি।');
+      if (!user) {
+        return ctx.unauthorized(
+          'Login করা লাগবে।'
+        );
+      }
 
-    const alreadyCompleted = enrollment.completedLessons?.some((l: any) => l.id === lesson.id);
+      if (user.role?.name !== 'Student') {
+        return ctx.forbidden(
+          'শুধুমাত্র Student নিজের enrollment দেখতে পারবে।'
+        );
+      }
 
-    if (!alreadyCompleted) {
-      const updatedIds = [...(enrollment.completedLessons?.map((l: any) => l.id) || []), lesson.id];
-      await strapi.documents('api::enrollment.enrollment').update({
-        documentId: id,
-        data: { completedLessons: updatedIds },
-      });
-    }
+      const { courseId } = ctx.params;
 
-    return { message: 'Lesson complete মার্ক করা হয়েছে।' };
-  },
+      if (!courseId) {
+        return ctx.badRequest(
+          'courseId দিতে হবে।'
+        );
+      }
 
-  async getProgress(ctx) {
-    const user = ctx.state.user;
-    const { id } = ctx.params; // enrollment এর documentId
+      const course = await strapi
+        .documents('api::course.course')
+        .findOne({
+          documentId: courseId,
+        });
 
-    const enrollment = await strapi.documents('api::enrollment.enrollment').findOne({
-      documentId: id,
-      populate: {
-        student: true,
-        completedLessons: true,
-        course: { populate: ['lessons'] },
-      },
-    });
+      if (!course) {
+        return ctx.notFound(
+          'Course পাওয়া যায়নি।'
+        );
+      }
 
-    if (!enrollment) return ctx.notFound('Enrollment পাওয়া যায়নি।');
-    if (enrollment.student?.id !== user.id) return ctx.forbidden('এটা তোমার enrollment না।');
+      const enrollments = await strapi
+        .documents('api::enrollment.enrollment')
+        .findMany({
+          filters: {
+            course: {
+              documentId: {
+                $eq: course.documentId,
+              },
+            },
+            student: {
+              id: {
+                $eq: user.id,
+              },
+            },
+          },
+        });
 
-    const totalLessons = enrollment.course?.lessons?.length || 0;
-    const completedCount = enrollment.completedLessons?.length || 0;
-    const percentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+      return {
+        data: enrollments[0] || null,
+      };
+    },
 
-    return { totalLessons, completedCount, percentage };
-  },
+    async completeLesson(ctx) {
+      const user = ctx.state.user;
 
-}));
+      if (!user) {
+        return ctx.unauthorized(
+          'Login করা লাগবে।'
+        );
+      }
+
+      if (user.role?.name !== 'Student') {
+        return ctx.forbidden(
+          'শুধুমাত্র Student lesson complete করতে পারবে।'
+        );
+      }
+
+      const { id } = ctx.params;
+      const { lessonId } = ctx.request.body || {};
+
+      if (!id || !lessonId) {
+        return ctx.badRequest(
+          'enrollmentId এবং lessonId দুটোই দিতে হবে।'
+        );
+      }
+
+      const enrollment = await strapi
+        .documents('api::enrollment.enrollment')
+        .findOne({
+          documentId: id,
+          populate: {
+            student: true,
+            course: true,
+            completedLessons: true,
+          },
+        });
+
+      if (!enrollment) {
+        return ctx.notFound(
+          'Enrollment পাওয়া যায়নি।'
+        );
+      }
+
+      if (enrollment.student?.id !== user.id) {
+        return ctx.forbidden(
+          'এটা তোমার enrollment না।'
+        );
+      }
+
+      const lesson = await strapi
+        .documents('api::lesson.lesson')
+        .findOne({
+          documentId: lessonId,
+          populate: ['course'],
+        });
+
+      if (!lesson) {
+        return ctx.notFound(
+          'Lesson পাওয়া যায়নি।'
+        );
+      }
+
+      if (lesson.course?.id !== enrollment.course?.id) {
+        return ctx.forbidden(
+          'এই lesson তোমার enrolled course-এর অংশ নয়।'
+        );
+      }
+
+      const alreadyCompleted =
+        enrollment.completedLessons?.some(
+          (completedLesson: any) =>
+            completedLesson.documentId === lesson.documentId ||
+            completedLesson.id === lesson.id
+        );
+
+      if (!alreadyCompleted) {
+        const completedLessonIds =
+          enrollment.completedLessons?.map(
+            (lessonItem: any) => lessonItem.id
+          ) || [];
+
+        await strapi
+          .documents('api::enrollment.enrollment')
+          .update({
+            documentId: id,
+            data: {
+              completedLessons: [
+                ...completedLessonIds,
+                lesson.id,
+              ],
+            },
+          });
+      }
+
+      return {
+        message: 'Lesson complete মার্ক করা হয়েছে।',
+      };
+    },
+
+    async getProgress(ctx) {
+      const user = ctx.state.user;
+
+      if (!user) {
+        return ctx.unauthorized(
+          'Login করা লাগবে।'
+        );
+      }
+
+      if (user.role?.name !== 'Student') {
+        return ctx.forbidden(
+          'শুধুমাত্র Student নিজের progress দেখতে পারবে।'
+        );
+      }
+
+      const { id } = ctx.params;
+
+      if (!id) {
+        return ctx.badRequest(
+          'enrollmentId দিতে হবে।'
+        );
+      }
+
+      const enrollment = await strapi
+        .documents('api::enrollment.enrollment')
+        .findOne({
+          documentId: id,
+          populate: {
+            student: true,
+            completedLessons: true,
+            course: {
+              populate: ['lessons'],
+            },
+          },
+        });
+
+      if (!enrollment) {
+        return ctx.notFound(
+          'Enrollment পাওয়া যায়নি।'
+        );
+      }
+
+      if (enrollment.student?.id !== user.id) {
+        return ctx.forbidden(
+          'এটা তোমার enrollment না।'
+        );
+      }
+
+      const totalLessons =
+        enrollment.course?.lessons?.length || 0;
+
+      const completedCount =
+        enrollment.completedLessons?.filter(
+          (completedLesson: any) =>
+            enrollment.course?.lessons?.some(
+              (courseLesson: any) =>
+                courseLesson.id === completedLesson.id
+            )
+        ).length || 0;
+
+      const percentage =
+        totalLessons > 0
+          ? Math.round(
+              (completedCount / totalLessons) * 100
+            )
+          : 0;
+
+      return {
+        totalLessons,
+        completedCount,
+        percentage,
+      };
+    },
+
+  })
+);

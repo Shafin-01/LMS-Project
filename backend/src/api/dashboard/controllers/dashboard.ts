@@ -12,9 +12,10 @@ export default {
     });
 
     if (!user || user.role?.name !== 'Admin') {
-      console.log("DEBUG - Full User Object:", JSON.stringify(user, null, 2));
-      return ctx.forbidden('শুধু Admin এই তথ্য দেখতে পারবে।');
-    }
+  return ctx.forbidden(
+    'শুধু Admin এই তথ্য দেখতে পারবে।'
+  );
+}
 
     const totalCourses = await strapi.db.query('api::course.course').count();
     const totalEnrollments = await strapi.db.query('api::enrollment.enrollment').count();
