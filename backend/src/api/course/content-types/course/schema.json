@@ -25,15 +25,15 @@
     },
     "instructor": {
       "type": "relation",
-      "relation": "oneToOne",
+      "relation": "manyToOne",
       "target": "plugin::users-permissions.user",
-      "mappedBy": "course"
+      "inversedBy": "courses"
     },
-    "enrollment": {
+    "enrollments": {
       "type": "relation",
-      "relation": "oneToOne",
+      "relation": "oneToMany",
       "target": "api::enrollment.enrollment",
-      "inversedBy": "course"
+      "mappedBy": "course"
     }
   }
 }

@@ -66,27 +66,27 @@
       "inversedBy": "users",
       "configurable": false
     },
-    "enrollment": {
+    "enrollments": {
       "type": "relation",
-      "relation": "oneToOne",
+      "relation": "oneToMany",
       "target": "api::enrollment.enrollment",
       "mappedBy": "student"
     },
-    "course": {
+    "courses": {
       "type": "relation",
-      "relation": "oneToOne",
+      "relation": "oneToMany",
       "target": "api::course.course",
-      "inversedBy": "instructor"
+      "mappedBy": "instructor"
     },
-    "quiz_result": {
+    "quiz_results": {
       "type": "relation",
-      "relation": "oneToOne",
+      "relation": "oneToMany",
       "target": "api::quiz-result.quiz-result",
       "mappedBy": "student"
     },
-    "blog_post": {
+    "blog_posts": {
       "type": "relation",
-      "relation": "oneToOne",
+      "relation": "oneToMany",
       "target": "api::blog-post.blog-post",
       "mappedBy": "author"
     }

@@ -455,7 +455,7 @@ export interface ApiBlogPostBlogPost extends Struct.CollectionTypeSchema {
   };
   attributes: {
     author: Schema.Attribute.Relation<
-      'oneToOne',
+      'manyToOne',
       'plugin::users-permissions.user'
     >;
     Body: Schema.Attribute.Blocks;
@@ -492,12 +492,12 @@ export interface ApiCourseCourse extends Struct.CollectionTypeSchema {
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     Description: Schema.Attribute.Blocks;
-    enrollment: Schema.Attribute.Relation<
-      'oneToOne',
+    enrollments: Schema.Attribute.Relation<
+      'oneToMany',
       'api::enrollment.enrollment'
     >;
     instructor: Schema.Attribute.Relation<
-      'oneToOne',
+      'manyToOne',
       'plugin::users-permissions.user'
     >;
     lessons: Schema.Attribute.Relation<'oneToMany', 'api::lesson.lesson'>;
@@ -523,14 +523,14 @@ export interface ApiEnrollmentEnrollment extends Struct.CollectionTypeSchema {
     singularName: 'enrollment';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
   };
   attributes: {
     completedLessons: Schema.Attribute.Relation<
       'manyToMany',
       'api::lesson.lesson'
     >;
-    course: Schema.Attribute.Relation<'oneToOne', 'api::course.course'>;
+    course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -543,7 +543,7 @@ export interface ApiEnrollmentEnrollment extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
     student: Schema.Attribute.Relation<
-      'oneToOne',
+      'manyToOne',
       'plugin::users-permissions.user'
     >;
     updatedAt: Schema.Attribute.DateTime;
@@ -579,8 +579,8 @@ export interface ApiLessonLesson extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
-    quiz_result: Schema.Attribute.Relation<
-      'oneToOne',
+    quiz_results: Schema.Attribute.Relation<
+      'oneToMany',
       'api::quiz-result.quiz-result'
     >;
     quizzes: Schema.Attribute.Relation<'oneToMany', 'api::quiz.quiz'>;
@@ -600,14 +600,14 @@ export interface ApiQuizResultQuizResult extends Struct.CollectionTypeSchema {
     singularName: 'quiz-result';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
   };
   attributes: {
     answers: Schema.Attribute.JSON;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    lesson: Schema.Attribute.Relation<'oneToOne', 'api::lesson.lesson'>;
+    lesson: Schema.Attribute.Relation<'manyToOne', 'api::lesson.lesson'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -617,7 +617,7 @@ export interface ApiQuizResultQuizResult extends Struct.CollectionTypeSchema {
     publishedAt: Schema.Attribute.DateTime;
     score: Schema.Attribute.Integer;
     student: Schema.Attribute.Relation<
-      'oneToOne',
+      'manyToOne',
       'plugin::users-permissions.user'
     >;
     submittedAt: Schema.Attribute.DateTime;
@@ -1118,13 +1118,13 @@ export interface PluginUsersPermissionsUser
   };
   attributes: {
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
-    blog_post: Schema.Attribute.Relation<
-      'oneToOne',
+    blog_posts: Schema.Attribute.Relation<
+      'oneToMany',
       'api::blog-post.blog-post'
     >;
     confirmationToken: Schema.Attribute.String & Schema.Attribute.Private;
     confirmed: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
-    course: Schema.Attribute.Relation<'oneToOne', 'api::course.course'>;
+    courses: Schema.Attribute.Relation<'oneToMany', 'api::course.course'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1133,8 +1133,8 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
-    enrollment: Schema.Attribute.Relation<
-      'oneToOne',
+    enrollments: Schema.Attribute.Relation<
+      'oneToMany',
       'api::enrollment.enrollment'
     >;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
@@ -1150,8 +1150,8 @@ export interface PluginUsersPermissionsUser
       }>;
     provider: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
-    quiz_result: Schema.Attribute.Relation<
-      'oneToOne',
+    quiz_results: Schema.Attribute.Relation<
+      'oneToMany',
       'api::quiz-result.quiz-result'
     >;
     resetPasswordToken: Schema.Attribute.String & Schema.Attribute.Private;

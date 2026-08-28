@@ -7,21 +7,21 @@
     "displayName": "Quiz Result"
   },
   "options": {
-    "draftAndPublish": true
+    "draftAndPublish": false
   },
   "pluginOptions": {},
   "attributes": {
     "student": {
       "type": "relation",
-      "relation": "oneToOne",
+      "relation": "manyToOne",
       "target": "plugin::users-permissions.user",
-      "inversedBy": "quiz_result"
+      "inversedBy": "quiz_results"
     },
     "lesson": {
       "type": "relation",
-      "relation": "oneToOne",
+      "relation": "manyToOne",
       "target": "api::lesson.lesson",
-      "inversedBy": "quiz_result"
+      "inversedBy": "quiz_results"
     },
     "score": {
       "type": "integer"

@@ -38,9 +38,9 @@
       "target": "api::enrollment.enrollment",
       "mappedBy": "completedLessons"
     },
-    "quiz_result": {
+    "quiz_results": {
       "type": "relation",
-      "relation": "oneToOne",
+      "relation": "oneToMany",
       "target": "api::quiz-result.quiz-result",
       "mappedBy": "lesson"
     }
