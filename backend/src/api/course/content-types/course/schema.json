@@ -23,10 +23,17 @@
       "target": "api::lesson.lesson",
       "mappedBy": "course"
     },
-    "Instructor": {
+    "instructor": {
       "type": "relation",
       "relation": "oneToOne",
-      "target": "plugin::users-permissions.user"
+      "target": "plugin::users-permissions.user",
+      "mappedBy": "course"
+    },
+    "enrollment": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::enrollment.enrollment",
+      "inversedBy": "course"
     }
   }
 }

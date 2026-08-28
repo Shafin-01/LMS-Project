@@ -31,6 +31,18 @@
     },
     "Content": {
       "type": "text"
+    },
+    "enrollments": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::enrollment.enrollment",
+      "mappedBy": "completedLessons"
+    },
+    "quiz_result": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::quiz-result.quiz-result",
+      "mappedBy": "lesson"
     }
   }
 }
