@@ -1,11 +1,12 @@
 import { fetchAPI } from "@/lib/api";
 import Link from "next/link";
+import EnrollButton from "@/components/EnrollButton";
 
 interface Course {
   id: number;
   documentId: string;
   Title: string;
-  Description: any; // Rich text handling-এর জন্য any দেওয়া হলো
+  Description: any;
 }
 
 interface CoursesResponse {
@@ -25,7 +26,7 @@ export default async function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto space-y-12">
-        {/* === Professional & Clean Navbar Section === */}
+        {/* === Navbar Section === */}
         <div className="flex justify-between items-center bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl shadow-md">
           <div className="flex items-center space-x-2">
             <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full"></span>
@@ -48,7 +49,7 @@ export default async function Home() {
             </Link>
           </div>
         </div>
-        {/* =========================================== */}
+
         <div className="flex flex-col items-center space-y-4 max-w-2xl mx-auto text-center">
           <span className="px-3 py-1 text-xs font-semibold tracking-wider text-indigo-600 uppercase bg-indigo-100 dark:bg-indigo-950 dark:text-indigo-400 rounded-full">
             Learning Management System
@@ -71,12 +72,10 @@ export default async function Home() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             {courses.map((course) => {
-              // Strapi rich text বা string হ্যান্ডেল করার জন্য সেফ চেক
               let descText = "No description provided.";
               if (typeof course.Description === "string") {
                 descText = course.Description;
               } else if (Array.isArray(course.Description)) {
-                // যদি blocks অ্যারে হয়
                 descText = course.Description.map((item: any) =>
                   item.children?.map((c: any) => c.text).join("")
                 ).join(" ");
@@ -97,14 +96,20 @@ export default async function Home() {
                       {descText}
                     </p>
                   </div>
-                  <Link
-                    href={`/courses/${course.documentId || course.id}`}
-                    className="pt-4 border-t border-slate-100 dark:border-slate-800 block"
-                  >
-                    <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                      View Course →
-                    </span>
-                  </Link>
+
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                    <Link
+                      href={`/courses/${course.documentId || course.id}`}
+                      className="block"
+                    >
+                      <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                        View Course →
+                      </span>
+                    </Link>
+
+                    {/* ফিক্সড: documentId অথবা id পাস করা হলো */}
+                    <EnrollButton courseId={course.documentId || course.id} />
+                  </div>
                 </div>
               );
             })}

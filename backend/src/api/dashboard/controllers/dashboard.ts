@@ -1,8 +1,18 @@
 export default {
   async stats(ctx: any) {
-    const user = ctx.state.user;
+    const userId = ctx.state.user?.id;
+
+    if (!userId) {
+      return ctx.forbidden('লগইন করা বাধ্যতামূলক।');
+    }
+
+    // ডেটাবেজ থেকে রোলসহ ইউজার ফেচ করা
+    const user: any = await strapi.entityService.findOne('plugin::users-permissions.user', userId, {
+      populate: ['role'],
+    });
 
     if (!user || user.role?.name !== 'Admin') {
+      console.log("DEBUG - Full User Object:", JSON.stringify(user, null, 2));
       return ctx.forbidden('শুধু Admin এই তথ্য দেখতে পারবে।');
     }
 
