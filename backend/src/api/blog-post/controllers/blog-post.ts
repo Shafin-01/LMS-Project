@@ -1,83 +1,125 @@
-/**
- * blog-post controller
- */
-
 import { factories } from '@strapi/strapi';
 
-export default factories.createCoreController('api::blog-post.blog-post', ({ strapi }) => ({
+export default factories.createCoreController(
+  'api::blog-post.blog-post',
+  ({ strapi }) => ({
 
-  async find(ctx) {
-    const user = ctx.state.user;
-    const roleName = user?.role?.name;
-    const canSeeDrafts = roleName === 'Admin' || roleName === 'Content Manager';
+    async create(ctx) {
+      const user = ctx.state.user;
+      if (!user) return ctx.unauthorized('Login করা বাধ্যতামূলক।');
 
-    // Admin/Content Manager ছাড়া বাকি সবার জন্য জোর করে published-only দেখাবো,
-    // যাই query-তে পাঠানো হোক না কেন।
-    if (!canSeeDrafts) {
-      ctx.query = { ...ctx.query, status: 'published' };
-    }
+      const roleName = user.role?.name;
+      if (!['Admin', 'Content Manager'].includes(roleName)) {
+        return ctx.forbidden('তোমার blog post তৈরি করার permission নেই।');
+      }
 
-    return super.find(ctx);
-  },
+      const requestData = ctx.request.body?.data || {};
+      if (!requestData.Title) {
+        return ctx.badRequest('Title দিতে হবে।');
+      }
 
-  async findOne(ctx) {
-    const user = ctx.state.user;
-    const roleName = user?.role?.name;
-    const canSeeDrafts = roleName === 'Admin' || roleName === 'Content Manager';
+      // super.create() বাইপাস করা হলো — Course/Lesson-এ যেমন দেখেছি,
+      // status unspecified রাখলে super.create() auto-publish করে দেয়,
+      // কিন্তু Document Service সরাসরি ব্যবহার করলে draft-ই থাকে।
+      // author field client থেকে না নিয়ে, logged-in user থেকেই বসানো হচ্ছে (security)।
+      const blogPost = await strapi.documents('api::blog-post.blog-post').create({
+        data: {
+          Title: requestData.Title,
+          Body: requestData.Body,
+          CoverImageURL: requestData.CoverImageURL || null,
+          author: user.id,
+        },
+      });
 
-    if (!canSeeDrafts) {
-      ctx.query = { ...ctx.query, status: 'published' };
-    }
+      return { data: blogPost };
+    },
 
-    return super.findOne(ctx);
-  },
+    async update(ctx) {
+      const user = ctx.state.user;
+      if (!user) return ctx.unauthorized('Login করা বাধ্যতামূলক।');
 
-  async create(ctx) {
-    const user = ctx.state.user;
+      const roleName = user.role?.name;
+      if (!['Admin', 'Content Manager'].includes(roleName)) {
+        return ctx.forbidden('তোমার blog post edit করার permission নেই।');
+      }
 
-    if (!user) {
-      return ctx.unauthorized('Login করা বাধ্যতামূলক।');
-    }
+      const existingPost = await strapi.documents('api::blog-post.blog-post').findOne({
+        documentId: ctx.params.id,
+      });
+      if (!existingPost) return ctx.notFound('Blog post পাওয়া যায়নি।');
 
-    if (!['Admin', 'Content Manager'].includes(user.role?.name)) {
-      return ctx.forbidden('তোমার blog post লেখার permission নেই।');
-    }
+      const requestData = ctx.request.body?.data || {};
+      const updateData: any = {};
+      if (requestData.Title !== undefined) updateData.Title = requestData.Title;
+      if (requestData.Body !== undefined) updateData.Body = requestData.Body;
+      if (requestData.CoverImageURL !== undefined) updateData.CoverImageURL = requestData.CoverImageURL;
 
-    if (!ctx.request.body?.data) {
-      ctx.request.body.data = {};
-    }
-    // Author সবসময় logged-in user, client থেকে পাঠানো যাবে না।
-    ctx.request.body.data.author = user.id;
+      // super.update() বাইপাস — একই auto-publish bug fix
+      const updatedPost = await strapi.documents('api::blog-post.blog-post').update({
+        documentId: ctx.params.id,
+        data: updateData,
+      });
 
-    return super.create(ctx);
-  },
+      return { data: updatedPost };
+    },
 
-  async update(ctx) {
-    const user = ctx.state.user;
+    async delete(ctx) {
+      const user = ctx.state.user;
+      if (!user) return ctx.unauthorized('Login করা বাধ্যতামূলক।');
 
-    if (!user) {
-      return ctx.unauthorized('Login করা বাধ্যতামূলক।');
-    }
+      const roleName = user.role?.name;
+      if (!['Admin', 'Content Manager'].includes(roleName)) {
+        return ctx.forbidden('তোমার blog post delete করার permission নেই।');
+      }
 
-    if (!['Admin', 'Content Manager'].includes(user.role?.name)) {
-      return ctx.forbidden('তোমার blog post edit করার permission নেই।');
-    }
+      return super.delete(ctx);
+    },
 
-    return super.update(ctx);
-  },
+    async publish(ctx) {
+      const user = ctx.state.user;
+      if (!user) return ctx.unauthorized('Login করা বাধ্যতামূলক।');
 
-  async delete(ctx) {
-    const user = ctx.state.user;
+      const roleName = user.role?.name;
+      if (!['Admin', 'Content Manager'].includes(roleName)) {
+        return ctx.forbidden('তোমার এই permission নেই।');
+      }
 
-    if (!user) {
-      return ctx.unauthorized('Login করা বাধ্যতামূলক।');
-    }
+      const { id } = ctx.params;
+      const post = await strapi.documents('api::blog-post.blog-post').findOne({ documentId: id });
+      if (!post) return ctx.notFound('Blog post পাওয়া যায়নি।');
 
-    if (!['Admin', 'Content Manager'].includes(user.role?.name)) {
-      return ctx.forbidden('তোমার blog post delete করার permission নেই।');
-    }
+      await strapi.documents('api::blog-post.blog-post').publish({ documentId: id });
 
-    return super.delete(ctx);
-  },
+      const publishedPost = await strapi.documents('api::blog-post.blog-post').findOne({
+        documentId: id,
+        status: 'published',
+      });
 
-}));
+      return { data: publishedPost };
+    },
+
+    async unpublish(ctx) {
+      const user = ctx.state.user;
+      if (!user) return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+
+      const roleName = user.role?.name;
+      if (!['Admin', 'Content Manager'].includes(roleName)) {
+        return ctx.forbidden('তোমার এই permission নেই।');
+      }
+
+      const { id } = ctx.params;
+      const post = await strapi.documents('api::blog-post.blog-post').findOne({ documentId: id });
+      if (!post) return ctx.notFound('Blog post পাওয়া যায়নি।');
+
+      await strapi.documents('api::blog-post.blog-post').unpublish({ documentId: id });
+
+      const draftPost = await strapi.documents('api::blog-post.blog-post').findOne({
+        documentId: id,
+        status: 'draft',
+      });
+
+      return { data: draftPost };
+    },
+
+  })
+);

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import RoleGuard from "@/components/RoleGuard";
-import { authFetch } from "@/lib/auth";
+import { authFetch, getUser } from "@/lib/auth";
 import { blocksToText } from "@/lib/api";
 
 interface Lesson {
@@ -32,6 +32,12 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Blog management link শুধু Admin/Content Manager-কে দেখানো হচ্ছে —
+  // Instructor-এর /dashboard/blog এ ঢোকার permission নেই, তাই button-ও দেখানো হচ্ছে না।
+  const currentUser = getUser();
+  const canManageBlog =
+    currentUser?.role?.name === "Admin" || currentUser?.role?.name === "Content Manager";
 
   const loadCourses = useCallback(async () => {
     setLoading(true);
@@ -99,12 +105,23 @@ function DashboardContent() {
             </p>
           </div>
 
-          <Link
-            href="/dashboard/courses/new"
-            className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
-          >
-            + New Course
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            {canManageBlog && (
+              <Link
+                href="/dashboard/blog"
+                className="bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+              >
+                Manage Blog Posts
+              </Link>
+            )}
+
+            <Link
+              href="/dashboard/courses/new"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+            >
+              + New Course
+            </Link>
+          </div>
         </div>
 
         {loading && (
