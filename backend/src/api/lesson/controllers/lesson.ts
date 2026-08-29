@@ -36,14 +36,6 @@ export default factories.createCoreController(
 
       const roleName = user.role?.name;
 
-      /*
-       * Student-এর জন্য lesson access অবশ্যই enrollment-এর
-       * মাধ্যমে verify করতে হবে।
-       *
-       * অন্য roles (Admin / Content Manager / Instructor)
-       * এখানে block করা হচ্ছে না, কারণ তাদের lesson management/
-       * platform access আলাদা permission দিয়ে নিয়ন্ত্রিত হবে।
-       */
       if (roleName === 'Student') {
         const courseDocumentId = lesson.course?.documentId;
 
@@ -57,16 +49,8 @@ export default factories.createCoreController(
           .documents('api::enrollment.enrollment')
           .findMany({
             filters: {
-              student: {
-                id: {
-                  $eq: user.id,
-                },
-              },
-              course: {
-                documentId: {
-                  $eq: courseDocumentId,
-                },
-              },
+              student: { id: { $eq: user.id } },
+              course: { documentId: { $eq: courseDocumentId } },
             },
           });
 
@@ -77,27 +61,27 @@ export default factories.createCoreController(
         }
       }
 
-      return {
-        data: lesson,
-      };
+      return { data: lesson };
     },
 
     async create(ctx) {
       const user = ctx.state.user;
 
       if (!user) {
-        return ctx.unauthorized(
-          'Login করা বাধ্যতামূলক।'
-        );
+        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
       }
 
-      if (user.role?.name === 'Instructor') {
+      const roleName = user.role?.name;
+
+      if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
+        return ctx.forbidden('তোমার lesson তৈরি করার permission নেই।');
+      }
+
+      if (roleName === 'Instructor') {
         const courseDocId = ctx.request.body?.data?.course;
 
         if (!courseDocId) {
-          return ctx.badRequest(
-            'Lesson-এর সাথে একটি course দিতে হবে।'
-          );
+          return ctx.badRequest('Lesson-এর সাথে একটি course দিতে হবে।');
         }
 
         const course = await strapi
@@ -108,15 +92,11 @@ export default factories.createCoreController(
           });
 
         if (!course) {
-          return ctx.notFound(
-            'Course পাওয়া যায়নি।'
-          );
+          return ctx.notFound('Course পাওয়া যায়নি।');
         }
 
         if (course.instructor?.id !== user.id) {
-          return ctx.forbidden(
-            'তুমি শুধু নিজের course-এ lesson যোগ করতে পারবে।'
-          );
+          return ctx.forbidden('তুমি শুধু নিজের course-এ lesson যোগ করতে পারবে।');
         }
       }
 
@@ -127,33 +107,29 @@ export default factories.createCoreController(
       const user = ctx.state.user;
 
       if (!user) {
-        return ctx.unauthorized(
-          'Login করা বাধ্যতামূলক।'
-        );
+        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
       }
 
-      if (user.role?.name === 'Instructor') {
+      const roleName = user.role?.name;
+
+      if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
+        return ctx.forbidden('তোমার lesson edit করার permission নেই।');
+      }
+
+      if (roleName === 'Instructor') {
         const lesson = await strapi
           .documents('api::lesson.lesson')
           .findOne({
             documentId: ctx.params.id,
-            populate: {
-              course: {
-                populate: ['instructor'],
-              },
-            },
+            populate: { course: { populate: ['instructor'] } },
           });
 
         if (!lesson) {
-          return ctx.notFound(
-            'Lesson পাওয়া যায়নি।'
-          );
+          return ctx.notFound('Lesson পাওয়া যায়নি।');
         }
 
         if (lesson.course?.instructor?.id !== user.id) {
-          return ctx.forbidden(
-            'তুমি শুধু নিজের course-এর lesson edit করতে পারবে।'
-          );
+          return ctx.forbidden('তুমি শুধু নিজের course-এর lesson edit করতে পারবে।');
         }
       }
 
@@ -164,33 +140,29 @@ export default factories.createCoreController(
       const user = ctx.state.user;
 
       if (!user) {
-        return ctx.unauthorized(
-          'Login করা বাধ্যতামূলক।'
-        );
+        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
       }
 
-      if (user.role?.name === 'Instructor') {
+      const roleName = user.role?.name;
+
+      if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
+        return ctx.forbidden('তোমার lesson delete করার permission নেই।');
+      }
+
+      if (roleName === 'Instructor') {
         const lesson = await strapi
           .documents('api::lesson.lesson')
           .findOne({
             documentId: ctx.params.id,
-            populate: {
-              course: {
-                populate: ['instructor'],
-              },
-            },
+            populate: { course: { populate: ['instructor'] } },
           });
 
         if (!lesson) {
-          return ctx.notFound(
-            'Lesson পাওয়া যায়নি।'
-          );
+          return ctx.notFound('Lesson পাওয়া যায়নি।');
         }
 
         if (lesson.course?.instructor?.id !== user.id) {
-          return ctx.forbidden(
-            'তুমি শুধু নিজের course-এর lesson delete করতে পারবে।'
-          );
+          return ctx.forbidden('তুমি শুধু নিজের course-এর lesson delete করতে পারবে।');
         }
       }
 
@@ -203,15 +175,17 @@ export default factories.createCoreController(
       const { answers } = ctx.request.body || {};
 
       if (!user) {
-        return ctx.unauthorized(
-          'Login করা লাগবে।'
-        );
+        return ctx.unauthorized('Login করা লাগবে।');
+      }
+
+      // Matrix অনুযায়ী "Take quizzes" শুধু Student-এর জন্য —
+      // Admin/Content Manager/Instructor কেউই quiz submit করতে পারবে না।
+      if (user.role?.name !== 'Student') {
+        return ctx.forbidden('শুধুমাত্র Student quiz submit করতে পারবে।');
       }
 
       if (!answers) {
-        return ctx.badRequest(
-          'answers পাঠাতে হবে।'
-        );
+        return ctx.badRequest('answers পাঠাতে হবে।');
       }
 
       const lesson = await strapi
@@ -222,63 +196,36 @@ export default factories.createCoreController(
         });
 
       if (!lesson) {
-        return ctx.notFound(
-          'Lesson পাওয়া যায়নি।'
-        );
+        return ctx.notFound('Lesson পাওয়া যায়নি।');
       }
 
-      /*
-       * Student হলে quiz submit করার আগেও enrollment verify করতে হবে।
-       * এতে non-enrolled student direct API call করে quiz submit
-       * করতে পারবে না।
-       */
-      if (user.role?.name === 'Student') {
-        const courseDocumentId = lesson.course?.documentId;
+      const courseDocumentId = lesson.course?.documentId;
 
-        if (!courseDocumentId) {
-          return ctx.forbidden(
-            'এই lesson কোনো valid course-এর সাথে যুক্ত নয়।'
-          );
-        }
+      if (!courseDocumentId) {
+        return ctx.forbidden('এই lesson কোনো valid course-এর সাথে যুক্ত নয়।');
+      }
 
-        const enrollments = await strapi
-          .documents('api::enrollment.enrollment')
-          .findMany({
-            filters: {
-              student: {
-                id: {
-                  $eq: user.id,
-                },
-              },
-              course: {
-                documentId: {
-                  $eq: courseDocumentId,
-                },
-              },
-            },
-          });
+      const enrollments = await strapi
+        .documents('api::enrollment.enrollment')
+        .findMany({
+          filters: {
+            student: { id: { $eq: user.id } },
+            course: { documentId: { $eq: courseDocumentId } },
+          },
+        });
 
-        if (enrollments.length === 0) {
-          return ctx.forbidden(
-            'Quiz দিতে হলে আগে এই course-এ enroll করতে হবে।'
-          );
-        }
+      if (enrollments.length === 0) {
+        return ctx.forbidden('Quiz দিতে হলে আগে এই course-এ enroll করতে হবে।');
       }
 
       const quizzes = await strapi
         .documents('api::quiz.quiz')
         .findMany({
-          filters: {
-            lesson: {
-              id: lesson.id,
-            },
-          },
+          filters: { lesson: { id: lesson.id } },
         });
 
       if (!quizzes || quizzes.length === 0) {
-        return ctx.badRequest(
-          'এই lesson-এ কোনো quiz নেই।'
-        );
+        return ctx.badRequest('এই lesson-এ কোনো quiz নেই।');
       }
 
       let score = 0;
@@ -286,10 +233,7 @@ export default factories.createCoreController(
       for (const quiz of quizzes) {
         const studentAnswer = answers[quiz.documentId];
 
-        if (
-          studentAnswer &&
-          studentAnswer === quiz.CorrectAnswer
-        ) {
+        if (studentAnswer && studentAnswer === quiz.CorrectAnswer) {
           score += 1;
         }
       }

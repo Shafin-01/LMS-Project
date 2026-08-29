@@ -31,6 +31,12 @@ const customRoutes = [
     handler: 'enrollment.getProgress',
     config: { policies: [] },
   },
+  {
+    method: 'GET',
+    path: '/enrollments/course/:courseId/progress',
+    handler: 'enrollment.courseProgress',
+    config: { policies: [] },
+  },
 ];
 
 const defaultRouter = factories.createCoreRouter('api::enrollment.enrollment');
@@ -40,8 +46,6 @@ const customRouter = (innerRouter: any, extraRoutes: any[] = []) => {
   return {
     get routes() {
       if (!routes) {
-        // 🔧 আগে ছিল innerRouter.routes.concat(extraRoutes) — default route আগে match হতো,
-        // যেটা /enrollments/my-enrollments কে /enrollments/:id ভেবে ধরে নিত। এখন custom route আগে।
         routes = extraRoutes.concat(innerRouter.routes);
       }
       return routes;
