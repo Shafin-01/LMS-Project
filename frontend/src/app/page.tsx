@@ -71,6 +71,15 @@ function computeProgress(enrollment: EnrollmentEntry): number {
   return Math.round((completedCount / totalLessons) * 100);
 }
 
+// One role-relevant shortcut for the logged-in hero — everything else is
+// already reachable from the Navbar, so the hero doesn't need to repeat it.
+const HERO_QUICK_LINK: Record<string, { href: string; label: string }> = {
+  Admin: { href: "/admin", label: "Go to Admin Panel" },
+  "Content Manager": { href: "/dashboard", label: "Go to Dashboard" },
+  Instructor: { href: "/dashboard", label: "Go to Dashboard" },
+  Student: { href: "/my-courses", label: "Go to My Courses" },
+};
+
 export default function Home() {
   const [user, setUser] = useState<StrapiUser | null>(null);
   const [posts, setPosts] = useState<BlogPost[] | null>(null);
@@ -87,9 +96,6 @@ export default function Home() {
   const loggedIn = !!user;
   const roleName = user?.role?.name;
   const isStudent = roleName === "Student";
-  const isManagement =
-    roleName === "Admin" || roleName === "Content Manager" || roleName === "Instructor";
-  const isAdmin = roleName === "Admin";
 
   // A Student's enrollments, with per-course progress, so the home page
   // can show a personalized "Continue Learning" row instead of leaving
@@ -122,7 +128,7 @@ export default function Home() {
     let cancelled = false;
 
     fetchAPI<BlogPostsResponse>(
-      "/blog-posts?populate=*&sort=publishedAt:desc&pagination[limit]=3"
+      "/blog-posts?populate=*&sort=publishedAt:desc&pagination[limit]=4"
     )
       .then((res) => {
         if (!cancelled) setPosts(res.data || []);
@@ -154,42 +160,16 @@ export default function Home() {
                 Pick up where you left off, or explore something new in the course catalog.
               </p>
 
-              {/* Logged-in users get direct, role-relevant shortcuts instead
-                  of the onboarding pitch shown to first-time visitors. */}
-              <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
+              {/* The Navbar already links to Courses, My Courses, Dashboard and
+                  Admin Panel, so the hero only needs one role-relevant shortcut
+                  rather than repeating every nav link down here too. */}
+              <div className="pt-2">
                 <Link
-                  href="/courses"
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-3 rounded-lg transition-colors"
+                  href={HERO_QUICK_LINK[roleName || ""]?.href || "/courses"}
+                  className="inline-block bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-3 rounded-lg transition-colors"
                 >
-                  Browse Courses
+                  {HERO_QUICK_LINK[roleName || ""]?.label || "Browse Courses"}
                 </Link>
-
-                {isStudent && (
-                  <Link
-                    href="/my-courses"
-                    className="bg-slate-900 border border-slate-800 hover:border-slate-700 text-white font-medium px-6 py-3 rounded-lg transition-colors"
-                  >
-                    My Courses
-                  </Link>
-                )}
-
-                {isManagement && (
-                  <Link
-                    href="/dashboard"
-                    className="bg-slate-900 border border-slate-800 hover:border-slate-700 text-white font-medium px-6 py-3 rounded-lg transition-colors"
-                  >
-                    Dashboard
-                  </Link>
-                )}
-
-                {isAdmin && (
-                  <Link
-                    href="/admin"
-                    className="bg-slate-900 border border-slate-800 hover:border-slate-700 text-white font-medium px-6 py-3 rounded-lg transition-colors"
-                  >
-                    Admin Panel
-                  </Link>
-                )}
               </div>
             </>
           ) : (
@@ -221,8 +201,71 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Continue Learning — a Student's own enrolled courses with progress,
-          so the most useful, personal thing they can do is front and center. */}
+      {/* Latest from the Blog — shown first for a returning user, above
+          Continue Learning, since it's the same for everyone and loads
+          without waiting on a Student-only enrollments call. */}
+      {loggedIn && (
+        <section className="py-16 px-4 sm:px-6 lg:px-8 border-t border-slate-900">
+          <div className="max-w-6xl mx-auto space-y-8">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-2xl sm:text-3xl font-bold text-white">Latest from the Blog</h2>
+              <Link href="/blog" className="text-sm font-medium text-indigo-400 hover:text-indigo-300 shrink-0">
+                View all articles →
+              </Link>
+            </div>
+
+            {posts === null ? (
+              <p className="text-slate-500 text-sm">Loading articles…</p>
+            ) : posts.length === 0 ? (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-slate-400 text-sm">
+                No articles have been published yet. Check back soon.
+              </div>
+            ) : (
+              // auto-fit keeps cards from leaving empty grid tracks when
+              // there are only one or two published posts to preview.
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-6">
+                {posts.map((post) => (
+                  <Link
+                    key={post.id}
+                    href={`/blog/${post.documentId || post.id}`}
+                    className="group flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-slate-700 transition-colors"
+                  >
+                    {post.CoverImageURL ? (
+                      <img
+                        src={post.CoverImageURL}
+                        alt={post.Title}
+                        className="w-full h-36 object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-36 bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-900 flex items-center justify-center">
+                        <span className="text-xl font-extrabold text-indigo-500/30">LMS</span>
+                      </div>
+                    )}
+                    <div className="p-5 space-y-2">
+                      <h3 className="text-white font-semibold group-hover:text-indigo-300 transition-colors">
+                        {post.Title}
+                      </h3>
+                      <p className="text-sm text-slate-400 line-clamp-2">
+                        {blocksExcerpt(post.Body)}
+                      </p>
+                      {post.author?.username && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-[11px] font-semibold text-indigo-300">
+                            {post.author.username[0]?.toUpperCase()}
+                          </span>
+                          <span className="text-xs text-slate-500">{post.author.username}</span>
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Continue Learning — a Student's own enrolled courses with progress. */}
       {isStudent && (
         <section className="py-16 px-4 sm:px-6 lg:px-8 border-t border-slate-900">
           <div className="max-w-6xl mx-auto space-y-8">
@@ -246,8 +289,10 @@ export default function Home() {
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {enrollments.slice(0, 3).map((enrollment) => {
+              // auto-fit keeps cards from leaving empty grid tracks when
+              // there are only one or two in-progress courses to show.
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-6">
+                {enrollments.slice(0, 4).map((enrollment) => {
                   const percentage = computeProgress(enrollment);
                   return (
                     <Link
@@ -268,56 +313,6 @@ export default function Home() {
                     </Link>
                   );
                 })}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Latest from the Blog — real, live content for a returning user,
-          instead of leaving the page mostly empty below the hero. */}
-      {loggedIn && (
-        <section className="py-16 px-4 sm:px-6 lg:px-8 border-t border-slate-900">
-          <div className="max-w-6xl mx-auto space-y-8">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-2xl sm:text-3xl font-bold text-white">Latest from the Blog</h2>
-              <Link href="/blog" className="text-sm font-medium text-indigo-400 hover:text-indigo-300 shrink-0">
-                View all articles →
-              </Link>
-            </div>
-
-            {posts === null ? (
-              <p className="text-slate-500 text-sm">Loading articles…</p>
-            ) : posts.length === 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-slate-400 text-sm">
-                No articles have been published yet. Check back soon.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {posts.map((post) => (
-                  <Link
-                    key={post.id}
-                    href={`/blog/${post.documentId || post.id}`}
-                    className="flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-slate-700 transition-colors"
-                  >
-                    {post.CoverImageURL && (
-                      <img
-                        src={post.CoverImageURL}
-                        alt={post.Title}
-                        className="w-full h-36 object-cover"
-                      />
-                    )}
-                    <div className="p-5 space-y-2">
-                      <h3 className="text-white font-semibold">{post.Title}</h3>
-                      <p className="text-sm text-slate-400 line-clamp-2">
-                        {blocksExcerpt(post.Body)}
-                      </p>
-                      {post.author?.username && (
-                        <p className="text-xs text-slate-500 pt-1">— {post.author.username}</p>
-                      )}
-                    </div>
-                  </Link>
-                ))}
               </div>
             )}
           </div>
