@@ -18,15 +18,24 @@ export default factories.createCoreController(
         return ctx.forbidden('তোমার course তৈরি করার permission নেই।');
       }
 
-      if (roleName === 'Instructor') {
-        if (!ctx.request.body?.data) {
-          ctx.request.body.data = {};
-        }
+      const requestData = ctx.request.body?.data || {};
 
-        ctx.request.body.data.instructor = user.id;
+      if (!requestData.Title || !requestData.Title.trim()) {
+        return ctx.badRequest('Course-এর Title দিতে হবে।');
       }
 
-      return super.create(ctx);
+      const instructorId =
+        roleName === 'Instructor' ? user.id : requestData.instructor;
+
+      const course = await strapi.documents('api::course.course').create({
+        data: {
+          Title: requestData.Title,
+          Description: requestData.Description,
+          ...(instructorId ? { instructor: instructorId } : {}),
+        },
+      });
+
+      return { data: course };
     },
 
     async update(ctx) {
@@ -146,6 +155,90 @@ export default factories.createCoreController(
       }));
 
       return { data };
+    },
+
+    /**
+     * Course publish করা — Strapi-র default router এটা নিজে থেকে
+     * বানিয়ে দেয় না, তাই নিজেরাই Document Service API-এর publish()
+     * ব্যবহার করে বানিয়ে দিচ্ছি।
+     */
+    async publish(ctx) {
+      const user = ctx.state.user;
+
+      if (!user) {
+        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      }
+
+      const roleName = user.role?.name;
+
+      if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
+        return ctx.forbidden('তোমার এই permission নেই।');
+      }
+
+      const { id } = ctx.params;
+
+      const course = await strapi.documents('api::course.course').findOne({
+        documentId: id,
+        populate: ['instructor'],
+      });
+
+      if (!course) {
+        return ctx.notFound('Course পাওয়া যায়নি।');
+      }
+
+      if (roleName === 'Instructor' && course.instructor?.id !== user.id) {
+        return ctx.forbidden('তুমি শুধু নিজের course-ই publish করতে পারবে।');
+      }
+
+      await strapi.documents('api::course.course').publish({ documentId: id });
+
+      const publishedCourse = await strapi.documents('api::course.course').findOne({
+        documentId: id,
+        status: 'published',
+      });
+
+      return { data: publishedCourse };
+    },
+
+    /**
+     * Course unpublish করা।
+     */
+    async unpublish(ctx) {
+      const user = ctx.state.user;
+
+      if (!user) {
+        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      }
+
+      const roleName = user.role?.name;
+
+      if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
+        return ctx.forbidden('তোমার এই permission নেই।');
+      }
+
+      const { id } = ctx.params;
+
+      const course = await strapi.documents('api::course.course').findOne({
+        documentId: id,
+        populate: ['instructor'],
+      });
+
+      if (!course) {
+        return ctx.notFound('Course পাওয়া যায়নি।');
+      }
+
+      if (roleName === 'Instructor' && course.instructor?.id !== user.id) {
+        return ctx.forbidden('তুমি শুধু নিজের course-ই unpublish করতে পারবে।');
+      }
+
+      await strapi.documents('api::course.course').unpublish({ documentId: id });
+
+      const draftCourse = await strapi.documents('api::course.course').findOne({
+        documentId: id,
+        status: 'draft',
+      });
+
+      return { data: draftCourse };
     },
 
   })
