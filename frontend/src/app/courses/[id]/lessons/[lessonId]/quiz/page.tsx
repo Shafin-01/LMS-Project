@@ -292,17 +292,20 @@ export default function QuizPage({
   if (!isManagement && !isEnrolled) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
-        <div className="max-w-md text-center space-y-5">
-          <div className="bg-red-950/40 border border-red-900 rounded-xl p-6">
+        <div className="max-w-md text-center flex flex-col items-center space-y-5">
+          <div className="bg-red-950/40 border border-red-900 rounded-xl p-6 w-full">
             <p className="text-red-400 font-medium">
               You need to enroll in this course before you can take this quiz.
             </p>
           </div>
           <Link
             href={`/courses/${resolvedParams.id}`}
-            className="inline-flex items-center text-indigo-400 hover:text-indigo-300 hover:underline"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
           >
-            ← Back to Course
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Course
           </Link>
         </div>
       </main>
@@ -312,15 +315,18 @@ export default function QuizPage({
   if (error || !lesson) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
-        <div className="max-w-md text-center space-y-5">
-          <div className="bg-red-950/40 border border-red-900 rounded-xl p-6">
+        <div className="max-w-md text-center flex flex-col items-center space-y-5">
+          <div className="bg-red-950/40 border border-red-900 rounded-xl p-6 w-full">
             <p className="text-red-400 font-medium">{error || "Lesson not found."}</p>
           </div>
           <Link
             href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
-            className="inline-flex items-center text-indigo-400 hover:text-indigo-300 hover:underline"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
           >
-            ← Back to Lesson
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Lesson
           </Link>
         </div>
       </main>
@@ -330,13 +336,16 @@ export default function QuizPage({
   if (quizzes.length === 0) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
-        <div className="max-w-md text-center space-y-5">
+        <div className="max-w-md text-center flex flex-col items-center space-y-5">
           <p className="text-slate-400">This lesson does not have a quiz yet.</p>
           <Link
             href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
-            className="text-indigo-400 hover:underline"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
           >
-            ← Back to Lesson
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Lesson
           </Link>
         </div>
       </main>
@@ -350,9 +359,12 @@ export default function QuizPage({
         <div className="max-w-3xl mx-auto space-y-6">
           <Link
             href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
-            className="text-sm text-indigo-400 hover:text-indigo-300 hover:underline"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
           >
-            ← Back to Lesson
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Lesson
           </Link>
 
           <div>
@@ -414,9 +426,12 @@ export default function QuizPage({
         <div className="max-w-3xl mx-auto space-y-6">
           <Link
             href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
-            className="text-sm text-indigo-400 hover:text-indigo-300 hover:underline"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
           >
-            ← Back to Lesson
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Lesson
           </Link>
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-4">
@@ -515,13 +530,6 @@ export default function QuizPage({
               );
             })}
           </div>
-
-          <Link
-            href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
-            className="inline-flex bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-5 py-2.5 rounded-lg"
-          >
-            Back to Lesson
-          </Link>
         </div>
       </main>
     );
@@ -533,9 +541,12 @@ export default function QuizPage({
       <div className="max-w-3xl mx-auto space-y-6">
         <Link
           href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
-          className="text-sm text-indigo-400 hover:text-indigo-300 hover:underline"
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
         >
-          ← Back to Lesson
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Back to Lesson
         </Link>
 
         <div>

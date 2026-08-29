@@ -13,6 +13,7 @@ export default function EnrollButton({ courseId, onEnrolled }: EnrollButtonProps
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
   const [roleName, setRoleName] = useState<string | undefined>(undefined);
   const [enrolled, setEnrolled] = useState(false);
   const [checkingEnrollment, setCheckingEnrollment] = useState(true);
@@ -24,21 +25,26 @@ export default function EnrollButton({ courseId, onEnrolled }: EnrollButtonProps
   // and client-rendered output would differ and cause a hydration error.
   useEffect(() => {
     setMounted(true);
-    setRoleName(getUser()?.role?.name);
+    const user = getUser();
+    setLoggedIn(!!user);
+    setRoleName(user?.role?.name);
   }, []);
 
-  // Only a Student can enroll in a course. Everyone else — a logged-out
-  // visitor, or an Admin / Content Manager / Instructor account — simply
-  // does not see an enroll control here at all.
-  const canEnroll = roleName === "Student";
+  // Enrolling is a Student-only action, but a logged-out visitor should
+  // still see the "Enroll Now" button — clicking it sends them to log in
+  // first. The button is only hidden for an already-logged-in account
+  // that can never be a Student (Admin / Content Manager / Instructor).
+  const isNonStudentAccount = loggedIn && roleName !== "Student";
+  const canEnroll = !isNonStudentAccount;
 
-  // Once we know this is a Student, check whether they are already
-  // enrolled in this specific course. Without this, a Student would keep
-  // seeing "Enroll Now" for a course they've already joined.
+  // Only a logged-in Student can already have an enrollment, so that's the
+  // only case where we need to check. A guest visitor never has one yet.
+  const isLoggedInStudent = loggedIn && roleName === "Student";
+
   useEffect(() => {
     if (!mounted) return;
 
-    if (!canEnroll) {
+    if (!isLoggedInStudent) {
       setCheckingEnrollment(false);
       return;
     }
@@ -60,13 +66,14 @@ export default function EnrollButton({ courseId, onEnrolled }: EnrollButtonProps
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, canEnroll, courseId]);
+  }, [mounted, isLoggedInStudent, courseId]);
 
   const handleEnroll = async () => {
     const user = getUser();
     if (!user) {
-      // Send the user to login, then straight back to this page once
-      // they're signed in, instead of dropping them on the home page.
+      // Send the user to log in, then straight back to this exact page
+      // once they're signed in — after logging in they land right back
+      // here and can press "Enroll Now" again.
       router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
       return;
     }
@@ -88,10 +95,7 @@ export default function EnrollButton({ courseId, onEnrolled }: EnrollButtonProps
     }
   };
 
-  // Before mount, or while checking enrollment status, render an empty
-  // placeholder of the same height so the page layout doesn't shift once
-  // the real button (or "Enrolled" badge) appears.
-  if (!mounted || (canEnroll && checkingEnrollment)) {
+  if (!mounted || (isLoggedInStudent && checkingEnrollment)) {
     return <div className="w-full h-9" />;
   }
 

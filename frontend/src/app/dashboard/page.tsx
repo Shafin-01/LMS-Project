@@ -42,10 +42,10 @@ function CourseCard({
   const descText = blocksToText(course.Description);
 
   return (
-    <div className="flex flex-col justify-between bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+    <div className="flex flex-col justify-between rounded-2xl bg-slate-900 border border-slate-800 p-6 sm:p-8 space-y-6 shadow-sm hover:border-slate-700 transition-colors">
       <div className="space-y-3">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-lg font-bold text-white">{course.Title}</h3>
+          <h3 className="text-xl font-bold text-white">{course.Title}</h3>
 
           <span
             className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${
@@ -58,16 +58,19 @@ function CourseCard({
           </span>
         </div>
 
-        <p className="text-sm text-slate-400 line-clamp-2">
+        <p className="text-sm text-slate-400 line-clamp-3">
           {descText || "No description available."}
         </p>
 
-        <p className="text-xs text-slate-500">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+          </svg>
           {course.lessons?.length || 0} lesson{course.lessons?.length === 1 ? "" : "s"}
-        </p>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-800">
+      <div className="flex flex-wrap items-center gap-2 pt-4 mt-auto border-t border-slate-800">
         <Link
           href={`/dashboard/courses/${course.documentId}`}
           className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800"
@@ -104,9 +107,6 @@ function DashboardContent() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  // The Blog management link is shown only to Admin/Content Manager —
-  // Instructors don't have permission to access /dashboard/blog, so the
-  // button is hidden for them too.
   const currentUser = getUser();
   const canManageBlog =
     currentUser?.role?.name === "Admin" || currentUser?.role?.name === "Content Manager";
@@ -169,29 +169,29 @@ function DashboardContent() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-            <p className="text-sm text-slate-400 mt-1">
-              Manage your courses, lessons, and quizzes from here.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
+    <main className="min-h-screen text-slate-100 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto space-y-10">
+        
+        {/* Center-aligned header matching Courses theme */}
+        <div className="text-center space-y-3 max-w-2xl mx-auto">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white">
+            Dashboard
+          </h1>
+          <p className="text-slate-400">
+            Manage your courses, lessons, and quizzes from here.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
             {canManageBlog && (
               <Link
                 href="/dashboard/blog"
-                className="bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+                className="bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors"
               >
                 Manage Blog Posts
               </Link>
             )}
-
             <Link
               href="/dashboard/courses/new"
-              className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors"
             >
               + New Course
             </Link>
@@ -199,11 +199,13 @@ function DashboardContent() {
         </div>
 
         {loading && (
-          <p className="text-slate-400">Loading courses...</p>
+          <div className="text-center py-10">
+            <p className="text-slate-400">Loading courses...</p>
+          </div>
         )}
 
         {!loading && error && (
-          <div className="bg-red-950/40 border border-red-900 rounded-xl p-4">
+          <div className="bg-red-950/40 border border-red-900 rounded-xl p-4 text-center max-w-2xl mx-auto">
             <p className="text-red-400">{error}</p>
           </div>
         )}
@@ -223,11 +225,7 @@ function DashboardContent() {
         )}
 
         {!loading && !error && courses.length > 0 && (
-          // A single flat list is enough: Admin/Content Manager can manage
-          // every course regardless of who created it, and an Instructor's
-          // "/courses/my-courses" call already returns only their own
-          // courses (filtered server-side), so there's nothing to split here.
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-6 lg:gap-8">
             {courses.map((course) => (
               <CourseCard
                 key={course.documentId}

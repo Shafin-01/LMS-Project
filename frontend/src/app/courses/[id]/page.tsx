@@ -1,5 +1,7 @@
 import { fetchAPI } from "@/lib/api";
-import Link from "next/link";
+import BackButton from "@/components/BackButton";
+import LessonList from "@/components/LessonList";
+import CourseProgress from "@/components/CourseProgress";
 
 interface Lesson {
   id: number;
@@ -49,11 +51,9 @@ export default async function CourseDetailPage({
 
   if (!course) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6">
-        <h1 className="text-2xl font-bold mb-4">Course not found</h1>
-        <Link href="/courses" className="text-indigo-400 hover:underline">
-          ← Back to Courses
-        </Link>
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center gap-6 p-6">
+        <h1 className="text-2xl font-bold">Course not found</h1>
+        <BackButton href="/courses" label="Back to Courses" />
       </div>
     );
   }
@@ -68,13 +68,12 @@ export default async function CourseDetailPage({
   }
 
   const lessonCount = course.lessons?.length || 0;
+  const courseIdentifier = course.documentId || String(course.id);
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        <Link href="/courses" className="inline-flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300">
-          ← Back to Courses
-        </Link>
+        <BackButton href="/courses" label="Back to Courses" />
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 space-y-5">
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white">{course.Title}</h1>
@@ -94,43 +93,13 @@ export default async function CourseDetailPage({
               {formatEnrollmentCount(course.enrollmentCount || 0)}
             </span>
           </div>
+
+          <CourseProgress courseId={courseIdentifier} enrollmentId={enrollmentId} />
         </div>
 
         <div className="space-y-4">
           <h2 className="text-2xl font-bold text-white">Course Lessons</h2>
-          {!course.lessons || course.lessons.length === 0 ? (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-slate-400">
-              No lessons available for this course yet.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {course.lessons.map((lesson, index) => {
-                const lessonUrl = `/courses/${course.documentId || course.id}/lessons/${lesson.documentId || lesson.id}${
-                  enrollmentId ? `?enrollmentId=${enrollmentId}` : ""
-                }`;
-                return (
-                  <Link
-                    key={lesson.id}
-                    href={lessonUrl}
-                    className="flex items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors"
-                  >
-                    <div className="flex items-center space-x-4 min-w-0">
-                      <span className="flex shrink-0 items-center justify-center w-8 h-8 rounded-lg bg-indigo-950 text-indigo-400 font-bold text-sm">
-                        {index + 1}
-                      </span>
-                      <span className="font-semibold text-white truncate">{lesson.Title}</span>
-                    </div>
-                    <span className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800">
-                      Watch Lesson
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3 w-3">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
-                      </svg>
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
+          <LessonList lessons={course.lessons || []} courseId={courseIdentifier} enrollmentId={enrollmentId} />
         </div>
       </div>
     </main>

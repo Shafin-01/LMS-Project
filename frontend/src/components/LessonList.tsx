@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { authFetch, getUser } from "@/lib/auth";
 import EnrollButton from "@/components/EnrollButton";
 
@@ -26,7 +25,6 @@ export default function LessonList({
   enrollmentId?: string;
 }) {
   const [access, setAccess] = useState<AccessState>("checking");
-  const pathname = usePathname();
 
   const checkAccess = async () => {
     const user = getUser();
@@ -71,14 +69,11 @@ export default function LessonList({
       {access === "locked-guest" && (
         <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-indigo-300">
-            Log in and enroll in this course to view its lessons.
+            Enroll in this course to view its lessons. You'll be asked to log in first.
           </p>
-          <Link
-            href={`/login?redirect=${encodeURIComponent(pathname)}`}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            Log In
-          </Link>
+          <div className="w-48 shrink-0">
+            <EnrollButton courseId={courseId} onEnrolled={checkAccess} />
+          </div>
         </div>
       )}
 
@@ -96,6 +91,7 @@ export default function LessonList({
           const lessonPath = `/courses/${courseId}/lessons/${lesson.documentId || lesson.id}${
             enrollmentId ? `?enrollmentId=${enrollmentId}` : ""
           }`;
+          
           const content = (
             <>
               <div className="flex items-center space-x-4">
@@ -108,17 +104,32 @@ export default function LessonList({
                   {lesson.Title}
                 </span>
               </div>
+              
+              {/* Button design update starts here */}
               {unlocked ? (
-                <span className="text-sm font-medium text-indigo-400">Watch Lesson →</span>
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-indigo-300 bg-slate-800/50 border border-slate-700 rounded-md group-hover:bg-slate-800 transition-colors">
+                  Watch Lesson
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </span>
               ) : (
-                <span className="text-sm font-medium text-slate-600">Locked</span>
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-500 bg-slate-800/30 border border-slate-800/50 rounded-md">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  Locked
+                </span>
               )}
+              {/* Button design update ends here */}
             </>
           );
+          
           if (unlocked) {
             return (
+              // Add 'group' class to Link so the inner span can react to hover
               <Link key={lesson.id} href={lessonPath}
-                className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors block">
+                className="group flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors block">
                 {content}
               </Link>
             );

@@ -111,91 +111,90 @@ function AdminPanelContent() {
   }
 
   return (
-    <main className="min-h-screen text-slate-100 pb-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto space-y-10 pt-8">
-        <div>
-          <Link href="/dashboard" className="text-sm text-indigo-400 hover:underline">
-            ← Back to Dashboard
-          </Link>
-          <h1 className="text-2xl font-bold text-white mt-2">Admin Panel</h1>
+    <main className="min-h-screen text-slate-100 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto space-y-10">
+        
+        {/* Center-aligned header matching Courses theme */}
+        <div className="text-center space-y-3 max-w-2xl mx-auto flex flex-col items-center">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white">
+            Admin Panel
+          </h1>
+          <p className="text-slate-400">
+            Overview of platform statistics, content, and user roles management.
+          </p>
         </div>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg">
-            {error}
+          <div className="bg-red-950/40 border border-red-900 rounded-xl p-4 text-center max-w-2xl mx-auto">
+            <p className="text-red-400">{error}</p>
           </div>
         )}
 
         {stats && (
-          <>
-            {/* Section 1: platform content — how much has been built so far. */}
+          <div className="space-y-10">
+            {/* Section 1: platform content */}
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-white">Platform Content</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                  <p className="text-slate-400 text-sm">Courses</p>
-                  <p className="text-2xl font-bold text-white">{stats.totalCourses}</p>
+              <h2 className="text-xl font-bold text-white">Platform Content</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm hover:border-slate-700 transition-colors">
+                  <p className="text-slate-400 text-sm font-medium mb-1">Courses</p>
+                  <p className="text-3xl font-bold text-white">{stats.totalCourses}</p>
                 </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                  <p className="text-slate-400 text-sm">Lessons</p>
-                  <p className="text-2xl font-bold text-white">{stats.totalLessons}</p>
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm hover:border-slate-700 transition-colors">
+                  <p className="text-slate-400 text-sm font-medium mb-1">Lessons</p>
+                  <p className="text-3xl font-bold text-white">{stats.totalLessons}</p>
                 </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                  <p className="text-slate-400 text-sm">Blog Posts</p>
-                  <p className="text-2xl font-bold text-white">{stats.totalBlogPosts}</p>
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm hover:border-slate-700 transition-colors">
+                  <p className="text-slate-400 text-sm font-medium mb-1">Blog Posts</p>
+                  <p className="text-3xl font-bold text-white">{stats.totalBlogPosts}</p>
                 </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                  <p className="text-slate-400 text-sm">Enrollments</p>
-                  <p className="text-2xl font-bold text-white">{stats.totalEnrollments}</p>
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm hover:border-slate-700 transition-colors">
+                  <p className="text-slate-400 text-sm font-medium mb-1">Enrollments</p>
+                  <p className="text-3xl font-bold text-white">{stats.totalEnrollments}</p>
                 </div>
               </div>
             </div>
 
-            {/* Section 2: how many accounts exist per role. Strapi's own
-                built-in "Public" and "Authenticated" roles are excluded on
-                the backend, so only the platform's four real roles show up. */}
+            {/* Section 2: users by role */}
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-white">Users by Role</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <h2 className="text-xl font-bold text-white">Users by Role</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                 {ROLE_DISPLAY_ORDER.map((roleName) => (
-                  <div key={roleName} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                    <p className="text-slate-400 text-sm">{roleName}</p>
-                    <p className="text-xl font-bold text-white">{stats.usersPerRole[roleName] ?? 0}</p>
+                  <div key={roleName} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm hover:border-slate-700 transition-colors">
+                    <p className="text-slate-400 text-sm font-medium mb-1">{roleName}</p>
+                    <p className="text-3xl font-bold text-white">{stats.usersPerRole[roleName] ?? 0}</p>
                   </div>
                 ))}
               </div>
             </div>
-          </>
+          </div>
         )}
 
-        {/* Section 3: manage individual accounts — change role or remove
-            the account entirely. An Admin's own row has no role dropdown
-            or delete action, so the platform can never end up without an
-            Admin able to manage it. */}
+        {/* Section 3: manage individual accounts */}
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-white">Users & Roles ({users.length})</h2>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+          <h2 className="text-xl font-bold text-white">Users & Roles ({users.length})</h2>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-x-auto shadow-sm">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-800 text-left text-slate-400">
-                  <th className="p-3">Username</th>
-                  <th className="p-3">Email</th>
-                  <th className="p-3">Current Role</th>
-                  <th className="p-3">Change Role</th>
-                  <th className="p-3">Delete</th>
+                  <th className="p-4 font-medium">Username</th>
+                  <th className="p-4 font-medium">Email</th>
+                  <th className="p-4 font-medium">Current Role</th>
+                  <th className="p-4 font-medium">Change Role</th>
+                  <th className="p-4 font-medium">Delete</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((u) => {
                   const isSelf = currentUser?.id === u.id;
                   return (
-                    <tr key={u.id} className="border-b border-slate-800/50 last:border-0">
-                      <td className="p-3 text-white">{u.username}</td>
-                      <td className="p-3 text-slate-300">{u.email}</td>
-                      <td className="p-3 text-slate-300">{u.role?.name || "—"}</td>
-                      <td className="p-3">
+                    <tr key={u.id} className="border-b border-slate-800/50 last:border-0 hover:bg-slate-800/20 transition-colors">
+                      <td className="p-4 text-white font-medium">{u.username}</td>
+                      <td className="p-4 text-slate-300">{u.email}</td>
+                      <td className="p-4 text-slate-300">{u.role?.name || "—"}</td>
+                      <td className="p-4">
                         {isSelf ? (
-                          <span className="text-slate-500 text-sm">{u.role?.name || "—"}</span>
+                          <span className="text-slate-500 text-sm px-3">{u.role?.name || "—"}</span>
                         ) : (
                           <select
                             defaultValue=""
@@ -214,7 +213,7 @@ function AdminPanelContent() {
                           </select>
                         )}
                       </td>
-                      <td className="p-3">
+                      <td className="p-4">
                         {!isSelf && (
                           <button
                             onClick={() => handleDeleteUser(u.id, u.username)}
