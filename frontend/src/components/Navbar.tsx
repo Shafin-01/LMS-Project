@@ -10,8 +10,8 @@ export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Route বদলালে user state আবার read করছি (login/logout করার পর navbar
-  // সাথে সাথে আপডেট হওয়ার জন্য)।
+  // Re-read the user on every route change, so the navbar updates right
+  // after a login or logout.
   useEffect(() => {
     setUser(getUser());
   }, [pathname]);
@@ -34,7 +34,7 @@ export default function Navbar() {
       </Link>
 
       <div className="flex items-center space-x-4 text-sm">
-        <Link href="/" className="text-slate-300 hover:text-white transition-colors">
+        <Link href="/courses" className="text-slate-300 hover:text-white transition-colors">
           Courses
         </Link>
 
@@ -42,7 +42,7 @@ export default function Navbar() {
           Blog
         </Link>
 
-        {user && (
+        {user && roleName === "Student" && (
           <Link href="/my-courses" className="text-slate-300 hover:text-white transition-colors">
             My Courses
           </Link>

@@ -44,8 +44,8 @@ export default async function CourseDetailPage({
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6">
         <h1 className="text-2xl font-bold mb-4">Course not found</h1>
-        <Link href="/" className="text-indigo-400 hover:underline">
-          ← Back to Home
+        <Link href="/courses" className="text-indigo-400 hover:underline">
+          ← Back to Courses
         </Link>
       </div>
     );
@@ -63,7 +63,7 @@ export default async function CourseDetailPage({
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        <Link href="/" className="inline-flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300">
+        <Link href="/courses" className="inline-flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300">
           ← Back to Courses
         </Link>
 

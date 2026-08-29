@@ -13,6 +13,7 @@ interface QuizItem {
   OptionB: string;
   OptionC: string;
   OptionD: string;
+  CorrectAnswer?: string;
 }
 
 interface LessonData {
@@ -40,6 +41,10 @@ interface ReviewData {
   review: ReviewItem[];
 }
 
+// Admin, Content Manager and Instructor accounts get a read-only preview
+// of the quiz (correct answers included) instead of the student flow.
+const MANAGEMENT_ROLES = ["Admin", "Content Manager", "Instructor"];
+
 export default function QuizPage({
   params,
 }: {
@@ -49,6 +54,9 @@ export default function QuizPage({
   const router = useRouter();
 
   const [mounted, setMounted] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
+  const [roleChecked, setRoleChecked] = useState(false);
+
   const [enrollmentChecked, setEnrollmentChecked] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
 
@@ -63,21 +71,29 @@ export default function QuizPage({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
-  // Hydration mismatch এড়ানোর জন্য — Navbar/EnrollButton-এ যেভাবে করা হয়েছিল সেভাবেই।
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
     const user = getUser();
+
     if (!user) {
       router.push("/login");
+      return;
     }
+
+    setRole(user.role?.name || null);
+    setRoleChecked(true);
   }, [router]);
 
+  const isManagement = role !== null && MANAGEMENT_ROLES.includes(role);
+
+  // Only a Student's enrollment needs to be verified before taking a quiz.
   useEffect(() => {
-    const user = getUser();
-    if (!user) {
+    if (!roleChecked) return;
+
+    if (isManagement) {
       setEnrollmentChecked(true);
       return;
     }
@@ -86,9 +102,7 @@ export default function QuizPage({
 
     async function checkEnrollment() {
       try {
-        const res = await authFetch(
-          `/enrollments/my-enrollment/${resolvedParams.id}`
-        );
+        const res = await authFetch(`/enrollments/my-enrollment/${resolvedParams.id}`);
         if (!cancelled) {
           setIsEnrolled(!!res.data?.documentId);
         }
@@ -107,23 +121,27 @@ export default function QuizPage({
     return () => {
       cancelled = true;
     };
-  }, [resolvedParams.id]);
+  }, [resolvedParams.id, roleChecked, isManagement]);
 
   useEffect(() => {
+    if (!roleChecked) return;
+
     let cancelled = false;
 
     async function fetchLesson() {
       setLoading(true);
       try {
-        // এখানে CorrectAnswer আসে না — lesson.ts এর findOne() Student-দের
-        // জন্য এটা আগে থেকেই বাদ দিয়ে দেয়, তাই এখানে সরাসরি ব্যবহার করা নিরাপদ।
+        // For Admin / Content Manager / Instructor the backend includes
+        // CorrectAnswer, which is what lets this page render a preview
+        // with the correct option highlighted. For a Student it is
+        // stripped out until they submit their attempt.
         const res = await authFetch(`/lessons/${resolvedParams.lessonId}`);
         if (!cancelled) {
           setLesson(res.data || null);
         }
       } catch (err: any) {
         if (!cancelled) {
-          setError(err?.message || "Quiz load করা যায়নি।");
+          setError(err?.message || "This quiz could not be loaded.");
         }
       } finally {
         if (!cancelled) {
@@ -136,19 +154,22 @@ export default function QuizPage({
     return () => {
       cancelled = true;
     };
-  }, [resolvedParams.lessonId]);
+  }, [resolvedParams.lessonId, roleChecked]);
 
-  // আগে quiz দেওয়া থাকলে তার score + review আনছি — থাকলে ফর্মের বদলে সরাসরি
-  // review দেখানো হবে, নতুন করে দেওয়ার সুযোগ থাকবে না।
+  // A Student's previous attempt (if any) is fetched so the quiz form can
+  // be replaced with a read-only review instead of being retaken.
   useEffect(() => {
+    if (!roleChecked || isManagement) {
+      setCheckingPrevious(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function fetchPreviousResult() {
       setCheckingPrevious(true);
       try {
-        const res = await authFetch(
-          `/lessons/${resolvedParams.lessonId}/my-quiz-result`
-        );
+        const res = await authFetch(`/lessons/${resolvedParams.lessonId}/my-quiz-result`);
         if (!cancelled) {
           setReviewData(res.data || null);
         }
@@ -167,15 +188,14 @@ export default function QuizPage({
     return () => {
       cancelled = true;
     };
-  }, [resolvedParams.lessonId]);
+  }, [resolvedParams.lessonId, roleChecked, isManagement]);
 
   const handleSelectAnswer = (quizDocumentId: string, letter: string) => {
     setAnswers((prev) => ({ ...prev, [quizDocumentId]: letter }));
   };
 
   const quizzes = lesson?.quizzes || [];
-  const allAnswered =
-    quizzes.length > 0 && quizzes.every((q) => !!answers[q.documentId]);
+  const allAnswered = quizzes.length > 0 && quizzes.every((q) => !!answers[q.documentId]);
 
   const handleSubmit = async () => {
     setSubmitError("");
@@ -187,23 +207,21 @@ export default function QuizPage({
         body: JSON.stringify({ answers }),
       });
 
-      // Submit সফল হলে review-সহ পুরো result আবার fetch করছি, যাতে score
-      // আর প্রতিটা প্রশ্নের সঠিক উত্তর একসাথে review screen-এ দেখানো যায়।
-      const reviewRes = await authFetch(
-        `/lessons/${resolvedParams.lessonId}/my-quiz-result`
-      );
+      // After a successful submission, fetch the full result (with the
+      // correct answers included) so the review screen renders right away.
+      const reviewRes = await authFetch(`/lessons/${resolvedParams.lessonId}/my-quiz-result`);
       setReviewData(reviewRes.data || null);
     } catch (err: any) {
-      setSubmitError(err?.message || "Quiz submit করা যায়নি।");
+      setSubmitError(err?.message || "The quiz could not be submitted.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (!mounted) {
+  if (!mounted || !roleChecked) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-        <p className="text-slate-400">Loading...</p>
+        <p className="text-slate-400">Loading…</p>
       </main>
     );
   }
@@ -211,18 +229,18 @@ export default function QuizPage({
   if (loading || !enrollmentChecked || checkingPrevious) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-        <p className="text-slate-400">Quiz load হচ্ছে...</p>
+        <p className="text-slate-400">Loading quiz…</p>
       </main>
     );
   }
 
-  if (!isEnrolled) {
+  if (!isManagement && !isEnrolled) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
         <div className="max-w-md text-center space-y-5">
           <div className="bg-red-950/40 border border-red-900 rounded-xl p-6">
             <p className="text-red-400 font-medium">
-              Quiz দিতে হলে আগে এই course-এ enroll করতে হবে।
+              You need to enroll in this course before you can take this quiz.
             </p>
           </div>
           <Link
@@ -241,9 +259,7 @@ export default function QuizPage({
       <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
         <div className="max-w-md text-center space-y-5">
           <div className="bg-red-950/40 border border-red-900 rounded-xl p-6">
-            <p className="text-red-400 font-medium">
-              {error || "Lesson পাওয়া যায়নি।"}
-            </p>
+            <p className="text-red-400 font-medium">{error || "Lesson not found."}</p>
           </div>
           <Link
             href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
@@ -256,11 +272,82 @@ export default function QuizPage({
     );
   }
 
-  // ===================== Review screen (আগে দেওয়া থাকলে) =====================
-  if (reviewData) {
-    const percentage = Math.round(
-      (reviewData.score / reviewData.totalQuestions) * 100
+  if (quizzes.length === 0) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
+        <div className="max-w-md text-center space-y-5">
+          <p className="text-slate-400">This lesson does not have a quiz yet.</p>
+          <Link
+            href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
+            className="text-indigo-400 hover:underline"
+          >
+            ← Back to Lesson
+          </Link>
+        </div>
+      </main>
     );
+  }
+
+  // ===================== Management preview (read-only) =====================
+  if (isManagement) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-3xl mx-auto space-y-6">
+          <Link
+            href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
+            className="text-sm text-indigo-400 hover:text-indigo-300 hover:underline"
+          >
+            ← Back to Lesson
+          </Link>
+
+          <div>
+            <h1 className="text-2xl font-bold text-white">Quiz: {lesson.Title}</h1>
+            <p className="text-sm text-slate-400 mt-1">
+              {quizzes.length} question{quizzes.length === 1 ? "" : "s"}
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {quizzes.map((quiz, idx) => (
+              <div
+                key={quiz.documentId}
+                className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3"
+              >
+                <p className="text-white font-medium">
+                  {idx + 1}. {quiz.Question}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {(["A", "B", "C", "D"] as const).map((letter) => {
+                    const optionKey = `Option${letter}` as keyof QuizItem;
+                    const optionText = quiz[optionKey] as string;
+                    const isCorrect = letter === quiz.CorrectAnswer;
+
+                    return (
+                      <div
+                        key={letter}
+                        className={`px-3 py-2 rounded-lg border text-sm ${
+                          isCorrect
+                            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                            : "border-slate-800 bg-slate-800/50 text-slate-300"
+                        }`}
+                      >
+                        {letter}. {optionText}
+                        {isCorrect && " — Correct answer"}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // ===================== Review screen (already submitted) =====================
+  if (reviewData) {
+    const percentage = Math.round((reviewData.score / reviewData.totalQuestions) * 100);
     const passed = percentage >= 50;
 
     return (
@@ -274,7 +361,7 @@ export default function QuizPage({
           </Link>
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-4">
-            <h1 className="text-2xl font-bold text-white">তুমি এই Quiz আগেই দিয়েছ</h1>
+            <h1 className="text-2xl font-bold text-white">You have already taken this quiz</h1>
             <div
               className={`text-5xl font-extrabold ${
                 passed ? "text-emerald-400" : "text-red-400"
@@ -283,12 +370,12 @@ export default function QuizPage({
               {reviewData.score} / {reviewData.totalQuestions}
             </div>
             <p className="text-slate-300">
-              তুমি <span className="font-semibold">{percentage}%</span> নম্বর পেয়েছিলে —{" "}
-              {passed ? "চমৎকার! 🎉" : "আরেকটু চেষ্টা করলে ভালো হতো।"}
+              You scored <span className="font-semibold">{percentage}%</span> —{" "}
+              {passed ? "well done!" : "review the material and aim higher next time."}
             </p>
             <p className="text-xs text-slate-500">
-              এই quiz একবারই দেওয়া যায়, তাই আবার দেওয়া যাবে না। নিচে তোমার উত্তর
-              আর সঠিক উত্তর মিলিয়ে দেখতে পারো।
+              Each quiz can only be attempted once. Your answers are compared with the
+              correct answers below.
             </p>
           </div>
 
@@ -311,7 +398,7 @@ export default function QuizPage({
                           : "bg-red-500/10 text-red-400"
                       }`}
                     >
-                      {isCorrect ? "সঠিক" : "ভুল"}
+                      {isCorrect ? "Correct" : "Incorrect"}
                     </span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -321,17 +408,15 @@ export default function QuizPage({
                       const isThisCorrect = letter === item.CorrectAnswer;
                       const isYourPick = letter === item.yourAnswer;
 
-                      let style =
-                        "border-slate-800 bg-slate-800/50 text-slate-300";
+                      let style = "border-slate-800 bg-slate-800/50 text-slate-300";
                       let tag = "";
 
                       if (isThisCorrect) {
-                        style =
-                          "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
-                        tag = " ✓ সঠিক উত্তর";
+                        style = "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
+                        tag = " — Correct answer";
                       } else if (isYourPick) {
                         style = "border-red-500/40 bg-red-500/10 text-red-300";
-                        tag = " ✗ তোমার উত্তর";
+                        tag = " — Your answer";
                       }
 
                       return (
@@ -361,23 +446,7 @@ export default function QuizPage({
     );
   }
 
-  if (quizzes.length === 0) {
-    return (
-      <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
-        <div className="max-w-md text-center space-y-5">
-          <p className="text-slate-400">এই lesson-এ কোনো quiz নেই।</p>
-          <Link
-            href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
-            className="text-indigo-400 hover:underline"
-          >
-            ← Back to Lesson
-          </Link>
-        </div>
-      </main>
-    );
-  }
-
-  // ===================== Quiz form (প্রথমবার দেওয়ার জন্য) =====================
+  // ===================== Quiz form (first attempt) =====================
   return (
     <main className="min-h-screen bg-slate-950 text-white py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto space-y-6">
@@ -391,8 +460,9 @@ export default function QuizPage({
         <div>
           <h1 className="text-2xl font-bold text-white">Quiz: {lesson.Title}</h1>
           <p className="text-sm text-slate-400 mt-1">
-            মোট {quizzes.length}টা প্রশ্ন — প্রতিটার একটা করে উত্তর বেছে নাও। মনে রাখবে,
-            এই quiz <span className="font-semibold">একবারই</span> দেওয়া যাবে।
+            {quizzes.length} question{quizzes.length === 1 ? "" : "s"} — choose one answer
+            for each. This quiz can only be submitted{" "}
+            <span className="font-semibold">once</span>.
           </p>
         </div>
 
@@ -449,11 +519,7 @@ export default function QuizPage({
           disabled={!allAnswered || submitting}
           className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition-colors"
         >
-          {submitting
-            ? "জমা দেওয়া হচ্ছে..."
-            : allAnswered
-            ? "Quiz জমা দাও"
-            : "সব প্রশ্নের উত্তর দাও"}
+          {submitting ? "Submitting…" : allAnswered ? "Submit Quiz" : "Answer all questions"}
         </button>
       </div>
     </main>

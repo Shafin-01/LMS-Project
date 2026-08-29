@@ -46,13 +46,13 @@ function AdminPanelContent() {
         authFetch("/dashboard/roles"),
       ]);
 
-      // stats() রেসপন্স {data:...} দিয়ে wrap করা না, সরাসরি object হিসেবে আসে —
-      // তাই statsRes.data নয়, statsRes সরাসরি ব্যবহার করা হচ্ছে।
+      // stats() returns a plain object, not wrapped in { data: ... },
+      // so statsRes is used directly here rather than statsRes.data.
       setStats(statsRes);
       setUsers(usersRes.data || []);
       setRoles(rolesRes.data || []);
     } catch (err: any) {
-      setError(err.message || "Data load করা যায়নি।");
+      setError(err.message || "Failed to load data.");
     } finally {
       setLoading(false);
     }
@@ -73,7 +73,7 @@ function AdminPanelContent() {
       });
       await loadData();
     } catch (err: any) {
-      setError(err.message || "Role change করা যায়নি।");
+      setError(err.message || "Failed to change role.");
     } finally {
       setUpdatingUserId(null);
     }
@@ -82,7 +82,7 @@ function AdminPanelContent() {
   if (loading) {
     return (
       <main className="min-h-screen text-slate-100 flex items-center justify-center">
-        <p className="text-slate-400">লোড হচ্ছে...</p>
+        <p className="text-slate-400">Loading…</p>
       </main>
     );
   }
@@ -154,7 +154,7 @@ function AdminPanelContent() {
                       <td className="p-3 text-slate-300">{u.role?.name || "—"}</td>
                       <td className="p-3">
                         {isSelf ? (
-                          <span className="text-slate-500 text-xs">নিজের role change করা যাবে না</span>
+                          <span className="text-slate-500 text-sm">{u.role?.name || "—"}</span>
                         ) : (
                           <select
                             defaultValue=""
@@ -163,7 +163,7 @@ function AdminPanelContent() {
                             className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-indigo-500 disabled:opacity-50"
                           >
                             <option value="" disabled>
-                              {updatingUserId === u.id ? "Updating..." : "Role বদলাও"}
+                              {updatingUserId === u.id ? "Updating…" : "Change role"}
                             </option>
                             {roles.map((r) => (
                               <option key={r.id} value={r.id}>

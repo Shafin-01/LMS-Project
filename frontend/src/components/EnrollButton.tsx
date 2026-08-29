@@ -11,18 +11,18 @@ export default function EnrollButton({ courseId }: { courseId: number | string }
   const [roleName, setRoleName] = useState<string | undefined>(undefined);
   const router = useRouter();
 
-  // getUser() browser-এর localStorage পড়ে, তাই এটা শুধু client-side এ
-  // (mount হওয়ার পর) কল করতে হবে — নাহলে server-render আর client-render
-  // আলাদা হয়ে "hydration mismatch" error দেয়।
+  // getUser() reads from localStorage, so it can only run after the
+  // component has mounted on the client — otherwise the server-rendered
+  // and client-rendered output would differ and cause a hydration error.
   useEffect(() => {
     setMounted(true);
     setRoleName(getUser()?.role?.name);
   }, []);
 
-  const isManagementRole =
-    roleName === "Admin" ||
-    roleName === "Content Manager" ||
-    roleName === "Instructor";
+  // Only a Student can enroll in a course. Everyone else — a logged-out
+  // visitor, or an Admin / Content Manager / Instructor account — simply
+  // does not see an enroll control here at all.
+  const canEnroll = roleName === "Student";
 
   const handleEnroll = async () => {
     const user = getUser();
@@ -39,7 +39,7 @@ export default function EnrollButton({ courseId }: { courseId: number | string }
         method: "POST",
         body: JSON.stringify({ courseId }),
       });
-      setMessage("Enroll সফল হয়েছে! ✅");
+      setMessage("You are now enrolled in this course.");
     } catch (err: any) {
       setMessage(err.message);
     } finally {
@@ -47,20 +47,14 @@ export default function EnrollButton({ courseId }: { courseId: number | string }
     }
   };
 
-  // Client-side mount হওয়ার আগ পর্যন্ত কিছু render না করাই ভালো
-  // (server আর client-এর প্রথম render মিলে যাওয়ার জন্য)।
+  // Before mount, render an empty placeholder of the same height so the
+  // page layout doesn't shift once the real (or absent) button appears.
   if (!mounted) {
-    return (
-      <div className="w-full h-9 bg-slate-800/50 rounded-lg animate-pulse" />
-    );
+    return <div className="w-full h-9" />;
   }
 
-  if (isManagementRole) {
-    return (
-      <p className="text-xs text-slate-500 text-center py-2">
-        এই role দিয়ে enroll করা যায় না।
-      </p>
-    );
+  if (!canEnroll) {
+    return null;
   }
 
   return (
@@ -70,7 +64,7 @@ export default function EnrollButton({ courseId }: { courseId: number | string }
         disabled={loading}
         className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium py-2 rounded-lg transition-colors disabled:opacity-50"
       >
-        {loading ? "Enrolling..." : "Enroll করো"}
+        {loading ? "Enrolling..." : "Enroll Now"}
       </button>
       {message && <p className="text-xs text-slate-400 text-center">{message}</p>}
     </div>

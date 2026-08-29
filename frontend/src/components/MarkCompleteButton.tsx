@@ -72,7 +72,7 @@ export default function MarkCompleteButton({
 
         /*
          * If every lesson is completed,
-         * current lesson is also considered completed.
+         * the current lesson is also considered completed.
          */
         const allLessonsCompleted =
           totalLessons > 0 && completedCount >= totalLessons;
@@ -112,7 +112,7 @@ export default function MarkCompleteButton({
 
     try {
       /*
-       * Mark lesson as completed in backend.
+       * Mark the lesson as completed on the backend.
        */
       await authFetch(
         `/enrollments/${enrollmentId}/complete-lesson`,
@@ -125,20 +125,20 @@ export default function MarkCompleteButton({
       );
 
       /*
-       * Immediately change this button.
+       * Update this button immediately.
        */
       setDone(true);
 
       /*
-       * Notify parent if it provided a callback.
+       * Notify the parent component, if it provided a callback.
        */
       onDone?.();
 
       /*
-       * Notify LessonProgress component.
+       * Notify the LessonProgress component.
        *
-       * LessonProgress listens for this event and
-       * fetches the latest progress immediately.
+       * LessonProgress listens for this event and refetches the
+       * latest progress right away.
        */
       if (typeof window !== "undefined") {
         window.dispatchEvent(
@@ -155,7 +155,7 @@ export default function MarkCompleteButton({
 
       alert(
         err?.message ||
-          "Lesson complete করা যায়নি। আবার চেষ্টা করুন।"
+          "This lesson could not be marked as complete. Please try again."
       );
     } finally {
       setLoading(false);
