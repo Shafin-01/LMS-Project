@@ -3,6 +3,7 @@
  */
 
 import { factories } from '@strapi/strapi';
+import { sanitizeUser } from '../../../utils/sanitize-user';
 
 export default factories.createCoreController('api::quiz-result.quiz-result', ({ strapi }) => ({
 
@@ -15,12 +16,12 @@ export default factories.createCoreController('api::quiz-result.quiz-result', ({
 
     const roleName = user.role?.name;
 
-    // এখানে ইচ্ছা করেই super.find(ctx) ব্যবহার করছি না।
-    // কারণ: Strapi-র REST filter validation "student" relation
-    // (যেটা plugin::users-permissions.user কে target করে) filter করতে
-    // দেয় না, যদি না ওই role-এর User model-এ "find" permission enable
-    // করা থাকে। এই সমস্যা এড়াতে সরাসরি Document Service API ব্যবহার
-    // করছি, যেটা REST layer bypass করে।
+    const sanitize = (results: any[]) =>
+      results.map((result: any) => ({
+        ...result,
+        student: sanitizeUser(result.student),
+      }));
+
     if (roleName === 'Admin' || roleName === 'Content Manager') {
       const results = await strapi.documents('api::quiz-result.quiz-result').findMany({
         populate: {
@@ -29,7 +30,7 @@ export default factories.createCoreController('api::quiz-result.quiz-result', ({
         },
       });
 
-      return { data: results };
+      return { data: sanitize(results) };
     }
 
     if (roleName === 'Student') {
@@ -43,7 +44,7 @@ export default factories.createCoreController('api::quiz-result.quiz-result', ({
         },
       });
 
-      return { data: results };
+      return { data: sanitize(results) };
     }
 
     if (roleName === 'Instructor') {
@@ -62,7 +63,7 @@ export default factories.createCoreController('api::quiz-result.quiz-result', ({
         },
       });
 
-      return { data: results };
+      return { data: sanitize(results) };
     }
 
     return ctx.forbidden('তোমার এই তথ্য দেখার permission নেই।');
@@ -97,12 +98,14 @@ export default factories.createCoreController('api::quiz-result.quiz-result', ({
       return ctx.forbidden('এটা তোমার course-এর result না।');
     }
 
-    return { data: result };
+    return {
+      data: {
+        ...result,
+        student: sanitizeUser(result.student),
+      },
+    };
   },
 
-  // Result শুধুমাত্র lesson.submitQuiz (auto-grading) থেকেই তৈরি হবে।
-  // Direct create কাউকে করতে দেওয়া হবে না, তা না হলে student নিজের
-  // ইচ্ছামতো score বসিয়ে দিতে পারবে।
   async create(ctx) {
     return ctx.forbidden('Quiz result সরাসরি তৈরি করা যাবে না। Quiz submit করলে backend automatic তৈরি করে দেয়।');
   },

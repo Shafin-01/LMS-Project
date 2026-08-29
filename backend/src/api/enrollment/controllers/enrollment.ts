@@ -1,4 +1,5 @@
 import { factories } from '@strapi/strapi';
+import { sanitizeUser } from '../../../utils/sanitize-user';
 
 export default factories.createCoreController(
     'api::enrollment.enrollment',
@@ -73,9 +74,6 @@ export default factories.createCoreController(
                 return ctx.badRequest('Valid courseId দিতে হবে।');
             }
 
-            /*
-             * প্রথমে draft version দিয়ে course-টা আদৌ আছে কিনা চেক করছি।
-             */
             const course = await strapi
                 .documents('api::course.course')
                 .findOne({
@@ -87,11 +85,6 @@ export default factories.createCoreController(
                 return ctx.notFound('Course পাওয়া যায়নি।');
             }
 
-            /*
-             * publishedAt draft version-এ সবসময় null থাকে (Strapi v5-এর নিয়ম),
-             * তাই publish হয়েছে কিনা বোঝার জন্য আলাদা করে status: 'published'
-             * দিয়ে fetch করে দেখতে হবে।
-             */
             const publishedCourse = await strapi
                 .documents('api::course.course')
                 .findOne({
@@ -145,7 +138,12 @@ export default factories.createCoreController(
                 return ctx.internalServerError('Enrollment তৈরি হয়েছে কিন্তু course relation পাওয়া যায়নি।');
             }
 
-            return { data: createdEnrollment };
+            return {
+                data: {
+                    ...createdEnrollment,
+                    student: sanitizeUser(createdEnrollment.student),
+                },
+            };
         },
 
         /**
@@ -173,7 +171,12 @@ export default factories.createCoreController(
                     },
                 });
 
-            return { data: enrollments };
+            const sanitizedEnrollments = enrollments.map((enrollment: any) => ({
+                ...enrollment,
+                student: sanitizeUser(enrollment.student),
+            }));
+
+            return { data: sanitizedEnrollments };
         },
 
         /**
@@ -220,7 +223,11 @@ export default factories.createCoreController(
 
             const enrollment = enrollments[0] || null;
 
-            return { data: enrollment };
+            return {
+                data: enrollment
+                    ? { ...enrollment, student: sanitizeUser(enrollment.student) }
+                    : null,
+            };
         },
 
         /**

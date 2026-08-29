@@ -83,3 +83,49 @@ export async function fetchAPI<T = unknown>(
   const data = (await response.json()) as T;
   return data;
 }
+
+/**
+ * Plain text (যা একটা <textarea>-তে টাইপ করা হয়) কে Strapi-র "blocks"
+ * (rich text) ফরম্যাটে কনভার্ট করে। Course-এর Description, Blog-এর Body
+ * ফিল্ড এই ফরম্যাট ছাড়া কিছু accept করে না।
+ *
+ * প্রতিটা নতুন লাইনকে আলাদা paragraph হিসেবে ধরা হচ্ছে।
+ */
+export function toBlocks(text: string): any[] {
+  if (!text || !text.trim()) {
+    return [
+      {
+        type: "paragraph",
+        children: [{ type: "text", text: "" }],
+      },
+    ];
+  }
+
+  return text
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => ({
+      type: "paragraph",
+      children: [{ type: "text", text: line }],
+    }));
+}
+
+/**
+ * Strapi-র "blocks" ফরম্যাট থেকে আবার plain text বের করে আনে —
+ * edit form খোলার সময় পুরনো ভ্যালু <textarea>-তে দেখানোর জন্য।
+ */
+export function blocksToText(blocks: any): string {
+  if (!blocks) return "";
+
+  if (typeof blocks === "string") return blocks;
+
+  if (!Array.isArray(blocks)) return "";
+
+  return blocks
+    .map((block: any) =>
+      (block.children || [])
+        .map((child: any) => child.text || "")
+        .join("")
+    )
+    .join("\n");
+}

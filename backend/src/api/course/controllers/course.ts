@@ -1,4 +1,5 @@
 import { factories } from '@strapi/strapi';
+import { sanitizeUser } from '../../../utils/sanitize-user';
 
 export default factories.createCoreController(
   'api::course.course',
@@ -17,8 +18,6 @@ export default factories.createCoreController(
         return ctx.forbidden('তোমার course তৈরি করার permission নেই।');
       }
 
-      // Instructor কখনো নিজের instructor ID নিজে choose করতে পারবে না।
-      // Backend logged-in Instructor-কে automatically assign করবে।
       if (roleName === 'Instructor') {
         if (!ctx.request.body?.data) {
           ctx.request.body.data = {};
@@ -61,7 +60,6 @@ export default factories.createCoreController(
           );
         }
 
-        // Instructor course-এর instructor অন্য user-এ change করতে পারবে না।
         if (ctx.request.body?.data?.instructor !== undefined) {
           ctx.request.body.data.instructor = user.id;
         }
@@ -103,6 +101,51 @@ export default factories.createCoreController(
       }
 
       return super.delete(ctx);
+    },
+
+    /**
+     * Dashboard-এর জন্য: Instructor নিজের সব course (draft + published)
+     * দেখবে, Admin/Content Manager সবার সব course দেখবে।
+     */
+    async myCourses(ctx) {
+      const user = ctx.state.user;
+
+      if (!user) {
+        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      }
+
+      const roleName = user.role?.name;
+
+      if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
+        return ctx.forbidden('তোমার এই তথ্য দেখার permission নেই।');
+      }
+
+      const isInstructor = roleName === 'Instructor';
+      const filters = isInstructor
+        ? { instructor: { id: { $eq: user.id } } }
+        : {};
+
+      const draftCourses = await strapi.documents('api::course.course').findMany({
+        status: 'draft',
+        filters,
+        populate: { instructor: true, lessons: true },
+      });
+
+      const publishedCourses = await strapi.documents('api::course.course').findMany({
+        status: 'published',
+        filters,
+      });
+      const publishedDocIds = new Set(
+        publishedCourses.map((c: any) => c.documentId)
+      );
+
+      const data = draftCourses.map((course: any) => ({
+        ...course,
+        instructor: sanitizeUser(course.instructor),
+        isPublished: publishedDocIds.has(course.documentId),
+      }));
+
+      return { data };
     },
 
   })
