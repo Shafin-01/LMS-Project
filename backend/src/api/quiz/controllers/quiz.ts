@@ -59,7 +59,19 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }) => 
         return ctx.forbidden('তুমি শুধু নিজের course এর quiz বানাতে পারবে।');
       }
     }
-    return super.create(ctx);
+
+    const response: any = await super.create(ctx);
+
+    // Quiz question-এর জন্য আলাদা করে কোনো Publish বাটন রাখছি না —
+    // এটা শুধু Lesson-এর ভেতরের ছোট sub-content, নিজে থেকে draft/publish
+    // manage করার দরকার নেই। তাই তৈরি হওয়ার সাথে সাথেই publish করে দিচ্ছি,
+    // যাতে student-এর submitQuiz() সাথে সাথেই এই question ধরতে পারে।
+    const documentId = response?.data?.documentId;
+    if (documentId) {
+      await strapi.documents('api::quiz.quiz').publish({ documentId });
+    }
+
+    return response;
   },
 
   async update(ctx) {
@@ -84,7 +96,17 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }) => 
         return ctx.forbidden('তুমি শুধু নিজের course এর quiz edit করতে পারবে।');
       }
     }
-    return super.update(ctx);
+
+    const response: any = await super.update(ctx);
+
+    // Update করার পরও আবার publish করছি, নাহলে edit করা answer/question
+    // published version-এ reflect হবে না, আর student পুরনো version দেখেই থেকে যাবে।
+    const documentId = ctx.params.id;
+    if (documentId) {
+      await strapi.documents('api::quiz.quiz').publish({ documentId });
+    }
+
+    return response;
   },
 
   async delete(ctx) {

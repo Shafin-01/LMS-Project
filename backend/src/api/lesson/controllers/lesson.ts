@@ -61,7 +61,20 @@ export default factories.createCoreController(
         }
       }
 
-      return { data: lesson };
+      // Student-দের কাছে quiz-এর সঠিক উত্তর leak হওয়া থেকে বাঁচাতে —
+      // quiz.ts controller-এ এই সুরক্ষা আগে থেকেই ছিল, কিন্তু এখানে lesson-এর
+      // populate দিয়ে quiz আনার সময় সেটা bypass হয়ে যাচ্ছিল। এখন এখানেও একই
+      // সুরক্ষা যোগ করা হলো।
+      const responseLesson: any = { ...lesson };
+
+      if (roleName === 'Student' && Array.isArray(responseLesson.quizzes)) {
+        responseLesson.quizzes = responseLesson.quizzes.map((quiz: any) => {
+          const { CorrectAnswer, ...rest } = quiz;
+          return rest;
+        });
+      }
+
+      return { data: responseLesson };
     },
 
     async create(ctx) {
@@ -77,13 +90,14 @@ export default factories.createCoreController(
         return ctx.forbidden('তোমার lesson তৈরি করার permission নেই।');
       }
 
+      const requestData = ctx.request.body?.data || {};
+      const courseDocId = requestData.course;
+
+      if (!courseDocId) {
+        return ctx.badRequest('Lesson-এর সাথে একটি course দিতে হবে।');
+      }
+
       if (roleName === 'Instructor') {
-        const courseDocId = ctx.request.body?.data?.course;
-
-        if (!courseDocId) {
-          return ctx.badRequest('Lesson-এর সাথে একটি course দিতে হবে।');
-        }
-
         const course = await strapi
           .documents('api::course.course')
           .findOne({
@@ -100,7 +114,16 @@ export default factories.createCoreController(
         }
       }
 
-      return super.create(ctx);
+      const lesson = await strapi.documents('api::lesson.lesson').create({
+        data: {
+          Title: requestData.Title,
+          Content: requestData.Content,
+          VideoURL: requestData.VideoURL,
+          course: courseDocId,
+        },
+      });
+
+      return { data: lesson };
     },
 
     async update(ctx) {
@@ -116,24 +139,37 @@ export default factories.createCoreController(
         return ctx.forbidden('তোমার lesson edit করার permission নেই।');
       }
 
-      if (roleName === 'Instructor') {
-        const lesson = await strapi
-          .documents('api::lesson.lesson')
-          .findOne({
-            documentId: ctx.params.id,
-            populate: { course: { populate: ['instructor'] } },
-          });
+      const existingLesson = await strapi
+        .documents('api::lesson.lesson')
+        .findOne({
+          documentId: ctx.params.id,
+          populate: { course: { populate: ['instructor'] } },
+        });
 
-        if (!lesson) {
-          return ctx.notFound('Lesson পাওয়া যায়নি।');
-        }
-
-        if (lesson.course?.instructor?.id !== user.id) {
-          return ctx.forbidden('তুমি শুধু নিজের course-এর lesson edit করতে পারবে।');
-        }
+      if (!existingLesson) {
+        return ctx.notFound('Lesson পাওয়া যায়নি।');
       }
 
-      return super.update(ctx);
+      if (
+        roleName === 'Instructor' &&
+        existingLesson.course?.instructor?.id !== user.id
+      ) {
+        return ctx.forbidden('তুমি শুধু নিজের course-এর lesson edit করতে পারবে।');
+      }
+
+      const requestData = ctx.request.body?.data || {};
+      const updateData: any = {};
+
+      if (requestData.Title !== undefined) updateData.Title = requestData.Title;
+      if (requestData.Content !== undefined) updateData.Content = requestData.Content;
+      if (requestData.VideoURL !== undefined) updateData.VideoURL = requestData.VideoURL;
+
+      const updatedLesson = await strapi.documents('api::lesson.lesson').update({
+        documentId: ctx.params.id,
+        data: updateData,
+      });
+
+      return { data: updatedLesson };
     },
 
     async delete(ctx) {
@@ -169,6 +205,84 @@ export default factories.createCoreController(
       return super.delete(ctx);
     },
 
+    async publish(ctx) {
+      const user = ctx.state.user;
+
+      if (!user) {
+        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      }
+
+      const roleName = user.role?.name;
+
+      if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
+        return ctx.forbidden('তোমার এই permission নেই।');
+      }
+
+      const { id } = ctx.params;
+
+      const lesson = await strapi
+        .documents('api::lesson.lesson')
+        .findOne({
+          documentId: id,
+          populate: { course: { populate: ['instructor'] } },
+        });
+
+      if (!lesson) {
+        return ctx.notFound('Lesson পাওয়া যায়নি।');
+      }
+
+      if (roleName === 'Instructor' && lesson.course?.instructor?.id !== user.id) {
+        return ctx.forbidden('তুমি শুধু নিজের course-এর lesson-ই publish করতে পারবে।');
+      }
+
+      await strapi.documents('api::lesson.lesson').publish({ documentId: id });
+
+      const publishedLesson = await strapi
+        .documents('api::lesson.lesson')
+        .findOne({ documentId: id, status: 'published' });
+
+      return { data: publishedLesson };
+    },
+
+    async unpublish(ctx) {
+      const user = ctx.state.user;
+
+      if (!user) {
+        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      }
+
+      const roleName = user.role?.name;
+
+      if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
+        return ctx.forbidden('তোমার এই permission নেই।');
+      }
+
+      const { id } = ctx.params;
+
+      const lesson = await strapi
+        .documents('api::lesson.lesson')
+        .findOne({
+          documentId: id,
+          populate: { course: { populate: ['instructor'] } },
+        });
+
+      if (!lesson) {
+        return ctx.notFound('Lesson পাওয়া যায়নি।');
+      }
+
+      if (roleName === 'Instructor' && lesson.course?.instructor?.id !== user.id) {
+        return ctx.forbidden('তুমি শুধু নিজের course-এর lesson-ই unpublish করতে পারবে।');
+      }
+
+      await strapi.documents('api::lesson.lesson').unpublish({ documentId: id });
+
+      const draftLesson = await strapi
+        .documents('api::lesson.lesson')
+        .findOne({ documentId: id, status: 'draft' });
+
+      return { data: draftLesson };
+    },
+
     async submitQuiz(ctx) {
       const user = ctx.state.user;
       const { id } = ctx.params;
@@ -178,8 +292,6 @@ export default factories.createCoreController(
         return ctx.unauthorized('Login করা লাগবে।');
       }
 
-      // Matrix অনুযায়ী "Take quizzes" শুধু Student-এর জন্য —
-      // Admin/Content Manager/Instructor কেউই quiz submit করতে পারবে না।
       if (user.role?.name !== 'Student') {
         return ctx.forbidden('শুধুমাত্র Student quiz submit করতে পারবে।');
       }
@@ -216,6 +328,21 @@ export default factories.createCoreController(
 
       if (enrollments.length === 0) {
         return ctx.forbidden('Quiz দিতে হলে আগে এই course-এ enroll করতে হবে।');
+      }
+
+      // একবার quiz দিয়ে ফেললে আর দ্বিতীয়বার দেওয়া যাবে না — সরাসরি API call
+      // করলেও যাতে ব্লক থাকে, তাই এই চেক backend-এই রাখা হচ্ছে, শুধু frontend-এ না।
+      const existingResults = await strapi
+        .documents('api::quiz-result.quiz-result')
+        .findMany({
+          filters: {
+            student: { id: { $eq: user.id } },
+            lesson: { id: { $eq: lesson.id } },
+          },
+        });
+
+      if (existingResults && existingResults.length > 0) {
+        return ctx.forbidden('তুমি ইতিমধ্যে এই quiz দিয়ে ফেলেছ, আবার দেওয়া যাবে না।');
       }
 
       const quizzes = await strapi
@@ -255,6 +382,73 @@ export default factories.createCoreController(
         score,
         totalQuestions: quizzes.length,
         result,
+      };
+    },
+
+    // Student আগে quiz দিয়ে থাকলে তার score + প্রতিটা প্রশ্নের সঠিক উত্তর ও
+    // নিজের দেওয়া উত্তর একসাথে ফেরত দেয় — review দেখানোর জন্য। এখানে
+    // CorrectAnswer দেওয়া নিরাপদ, কারণ এটা শুধু তখনই দেখানো হয় যখন সেই
+    // student ইতিমধ্যে quiz জমা দিয়ে ফেলেছে (আর দিতে পারবে না)।
+    async myQuizResult(ctx) {
+      const user = ctx.state.user;
+
+      if (!user) {
+        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      }
+
+      if (user.role?.name !== 'Student') {
+        return ctx.forbidden('শুধুমাত্র Student-এর নিজের quiz result এভাবে দেখা যাবে।');
+      }
+
+      const { id } = ctx.params;
+
+      const lesson = await strapi
+        .documents('api::lesson.lesson')
+        .findOne({ documentId: id });
+
+      if (!lesson) {
+        return ctx.notFound('Lesson পাওয়া যায়নি।');
+      }
+
+      const results = await strapi
+        .documents('api::quiz-result.quiz-result')
+        .findMany({
+          filters: {
+            student: { id: { $eq: user.id } },
+            lesson: { id: { $eq: lesson.id } },
+          },
+        });
+
+      if (!results || results.length === 0) {
+        return { data: null };
+      }
+
+      const result: any = results[0];
+
+      const quizzes = await strapi
+        .documents('api::quiz.quiz')
+        .findMany({
+          filters: { lesson: { id: lesson.id } },
+        });
+
+      const review = quizzes.map((quiz: any) => ({
+        documentId: quiz.documentId,
+        Question: quiz.Question,
+        OptionA: quiz.OptionA,
+        OptionB: quiz.OptionB,
+        OptionC: quiz.OptionC,
+        OptionD: quiz.OptionD,
+        CorrectAnswer: quiz.CorrectAnswer,
+        yourAnswer: (result.answers as any)?.[quiz.documentId] || null,
+      }));
+
+      return {
+        data: {
+          score: result.score,
+          totalQuestions: result.totalQuestions,
+          submittedAt: result.submittedAt,
+          review,
+        },
       };
     },
 
