@@ -11,7 +11,7 @@ export default factories.createCoreController('api::quiz-result.quiz-result', ({
     const user = ctx.state.user;
 
     if (!user) {
-      return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      return ctx.unauthorized('Login is required.');
     }
 
     const roleName = user.role?.name;
@@ -66,14 +66,14 @@ export default factories.createCoreController('api::quiz-result.quiz-result', ({
       return { data: sanitize(results) };
     }
 
-    return ctx.forbidden('তোমার এই তথ্য দেখার permission নেই।');
+    return ctx.forbidden('You do not have permission to view this information.');
   },
 
   async findOne(ctx) {
     const user = ctx.state.user;
 
     if (!user) {
-      return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      return ctx.unauthorized('Login is required.');
     }
 
     const result: any = await strapi.documents('api::quiz-result.quiz-result').findOne({
@@ -85,17 +85,17 @@ export default factories.createCoreController('api::quiz-result.quiz-result', ({
     });
 
     if (!result) {
-      return ctx.notFound('Result পাওয়া যায়নি।');
+      return ctx.notFound('Result not found.');
     }
 
     const roleName = user.role?.name;
 
     if (roleName === 'Student' && result.student?.id !== user.id) {
-      return ctx.forbidden('এটা তোমার result না।');
+      return ctx.forbidden('This is not your result.');
     }
 
     if (roleName === 'Instructor' && result.lesson?.course?.instructor?.id !== user.id) {
-      return ctx.forbidden('এটা তোমার course-এর result না।');
+      return ctx.forbidden('This is not a result from your course.');
     }
 
     return {
@@ -107,18 +107,18 @@ export default factories.createCoreController('api::quiz-result.quiz-result', ({
   },
 
   async create(ctx) {
-    return ctx.forbidden('Quiz result সরাসরি তৈরি করা যাবে না। Quiz submit করলে backend automatic তৈরি করে দেয়।');
+    return ctx.forbidden('A quiz result cannot be created directly. The backend creates one automatically when a quiz is submitted.');
   },
 
   async update(ctx) {
-    return ctx.forbidden('Quiz result পরিবর্তন করা যাবে না।');
+    return ctx.forbidden('A quiz result cannot be changed.');
   },
 
   async delete(ctx) {
     const user = ctx.state.user;
 
     if (!user || user.role?.name !== 'Admin') {
-      return ctx.forbidden('শুধু Admin quiz result delete করতে পারবে।');
+      return ctx.forbidden('Only an Admin can delete a quiz result.');
     }
 
     return super.delete(ctx);

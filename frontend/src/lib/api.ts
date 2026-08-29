@@ -85,11 +85,11 @@ export async function fetchAPI<T = unknown>(
 }
 
 /**
- * Plain text (যা একটা <textarea>-তে টাইপ করা হয়) কে Strapi-র "blocks"
- * (rich text) ফরম্যাটে কনভার্ট করে। Course-এর Description, Blog-এর Body
- * ফিল্ড এই ফরম্যাট ছাড়া কিছু accept করে না।
+ * Converts plain text (typed into a <textarea>) into Strapi's "blocks"
+ * (rich text) format. The Course Description and Blog Post Body fields
+ * only accept this format.
  *
- * প্রতিটা নতুন লাইনকে আলাদা paragraph হিসেবে ধরা হচ্ছে।
+ * Each new line is treated as a separate paragraph.
  */
 export function toBlocks(text: string): any[] {
   if (!text || !text.trim()) {
@@ -111,8 +111,8 @@ export function toBlocks(text: string): any[] {
 }
 
 /**
- * Strapi-র "blocks" ফরম্যাট থেকে আবার plain text বের করে আনে —
- * edit form খোলার সময় পুরনো ভ্যালু <textarea>-তে দেখানোর জন্য।
+ * Converts Strapi's "blocks" format back into plain text — used to show
+ * the existing value in a <textarea> when an edit form is opened.
  */
 export function blocksToText(blocks: any): string {
   if (!blocks) return "";

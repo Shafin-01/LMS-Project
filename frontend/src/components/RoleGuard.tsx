@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { getUser, StrapiUser } from "@/lib/auth";
 
 interface RoleGuardProps {
@@ -13,12 +13,15 @@ export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
   const [user, setUser] = useState<StrapiUser | null>(null);
   const [checked, setChecked] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const current = getUser();
 
     if (!current) {
-      router.push("/login");
+      // Send the user to login, then straight back to the page they were
+      // trying to reach once they're signed in.
+      router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
       return;
     }
 

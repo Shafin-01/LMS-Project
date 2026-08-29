@@ -45,6 +45,61 @@ interface ReviewData {
 // of the quiz (correct answers included) instead of the student flow.
 const MANAGEMENT_ROLES = ["Admin", "Content Manager", "Instructor"];
 
+// Small check / cross icons used inside the result badges below. Kept as
+// plain inline SVG (no icon library dependency) since only two are needed.
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3 shrink-0">
+      <path
+        fillRule="evenodd"
+        d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function CrossIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3 shrink-0">
+      <path
+        fillRule="evenodd"
+        d="M5.28 4.22a.75.75 0 00-1.06 1.06L8.94 10l-4.72 4.72a.75.75 0 101.06 1.06L10 11.06l4.72 4.72a.75.75 0 101.06-1.06L11.06 10l4.72-4.72a.75.75 0 00-1.06-1.06L10 8.94 5.28 4.22z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+// Compact pill used to mark an option as the correct one and/or the
+// student's own pick. Two of these can sit side by side on the same
+// option (e.g. when the student picked the correct answer), instead of
+// a single line of run-on text like "— Your answer, Correct answer".
+function OptionTag({
+  tone,
+  icon,
+  label,
+}: {
+  tone: "correct" | "picked-correct" | "picked-wrong";
+  icon: "check" | "cross";
+  label: string;
+}) {
+  const toneStyles: Record<typeof tone, string> = {
+    correct: "bg-emerald-500/15 text-emerald-300 ring-1 ring-inset ring-emerald-500/30",
+    "picked-correct": "bg-indigo-500/15 text-indigo-300 ring-1 ring-inset ring-indigo-500/30",
+    "picked-wrong": "bg-red-500/15 text-red-300 ring-1 ring-inset ring-red-500/30",
+  };
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${toneStyles[tone]}`}
+    >
+      {icon === "check" ? <CheckIcon /> : <CrossIcon />}
+      {label}
+    </span>
+  );
+}
+
 export default function QuizPage({
   params,
 }: {
@@ -325,14 +380,18 @@ export default function QuizPage({
                     return (
                       <div
                         key={letter}
-                        className={`px-3 py-2 rounded-lg border text-sm ${
+                        className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-sm ${
                           isCorrect
                             ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
                             : "border-slate-800 bg-slate-800/50 text-slate-300"
                         }`}
                       >
-                        {letter}. {optionText}
-                        {isCorrect && " — Correct answer"}
+                        <span>
+                          {letter}. {optionText}
+                        </span>
+                        {isCorrect && (
+                          <OptionTag tone="correct" icon="check" label="Correct" />
+                        )}
                       </div>
                     );
                   })}
@@ -408,24 +467,46 @@ export default function QuizPage({
                       const isThisCorrect = letter === item.CorrectAnswer;
                       const isYourPick = letter === item.yourAnswer;
 
+                      // Base styling reflects correctness first, then the
+                      // student's own (wrong) pick. The tags rendered next
+                      // to the option text can then layer "Your answer" on
+                      // top of "Correct" instead of one hiding the other.
                       let style = "border-slate-800 bg-slate-800/50 text-slate-300";
-                      let tag = "";
-
                       if (isThisCorrect) {
                         style = "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
-                        tag = " — Correct answer";
                       } else if (isYourPick) {
                         style = "border-red-500/40 bg-red-500/10 text-red-300";
-                        tag = " — Your answer";
                       }
 
                       return (
                         <div
                           key={letter}
-                          className={`px-3 py-2 rounded-lg border text-sm ${style}`}
+                          className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-sm ${style}`}
                         >
-                          {letter}. {optionText}
-                          {tag}
+                          <span>
+                            {letter}. {optionText}
+                          </span>
+                          {(isThisCorrect || isYourPick) && (
+                            <span className="flex items-center gap-1 shrink-0">
+                              {isThisCorrect && (
+                                <OptionTag tone="correct" icon="check" label="Correct" />
+                              )}
+                              {isYourPick &&
+                                (isThisCorrect ? (
+                                  <OptionTag
+                                    tone="picked-correct"
+                                    icon="check"
+                                    label="Your answer"
+                                  />
+                                ) : (
+                                  <OptionTag
+                                    tone="picked-wrong"
+                                    icon="cross"
+                                    label="Your answer"
+                                  />
+                                ))}
+                            </span>
+                          )}
                         </div>
                       );
                     })}

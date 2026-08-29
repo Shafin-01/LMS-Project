@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { authFetch } from "@/lib/auth";
+import { authFetch, uploadImage } from "@/lib/auth";
 import { toBlocks } from "@/lib/api";
 import RoleGuard from "@/components/RoleGuard";
+import { useToast } from "@/components/Toast";
 
 function NewBlogPostForm() {
   const [title, setTitle] = useState("");
@@ -13,7 +14,29 @@ function NewBlogPostForm() {
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
+  const { showToast } = useToast();
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset the input value so selecting the exact same file again still
+    // fires a change event (browsers otherwise treat it as a no-op).
+    e.target.value = "";
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      setCoverImageUrl(url);
+      showToast("Image uploaded.");
+    } catch (err: any) {
+      showToast(err.message || "Image upload failed.", "error");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,8 +44,8 @@ function NewBlogPostForm() {
     setSaving(true);
 
     try {
-      // Course/Lesson-এর মতোই — নতুন Blog Post ইচ্ছাকৃতভাবে draft হিসেবে তৈরি হচ্ছে,
-      // auto-publish করা হচ্ছে না। পরে list page থেকে Publish করতে হবে।
+      // Same as Course/Lesson — a new Blog Post is intentionally created as a
+      // draft, not auto-published. It gets published later from the list page.
       await authFetch("/blog-posts", {
         method: "POST",
         body: JSON.stringify({
@@ -34,9 +57,10 @@ function NewBlogPostForm() {
         }),
       });
 
+      showToast("Blog post created.");
       router.push("/dashboard/blog");
     } catch (err: any) {
-      setError(err.message || "Blog post তৈরি করা যায়নি।");
+      setError(err.message || "Failed to create blog post.");
       setSaving(false);
     }
   };
@@ -48,7 +72,7 @@ function NewBlogPostForm() {
           ← Back to Blog Posts
         </Link>
 
-        <h1 className="text-2xl font-bold text-white">নতুন Blog Post</h1>
+        <h1 className="text-2xl font-bold text-white">New Blog Post</h1>
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg">
@@ -69,13 +93,56 @@ function NewBlogPostForm() {
 
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">
-              Cover Image URL (optional)
+              Cover Image (optional)
             </label>
+
+            {coverImageUrl && (
+              <div className="relative mb-3 h-40 w-full overflow-hidden rounded-lg border border-slate-700">
+                <img
+                  src={coverImageUrl}
+                  alt="Cover preview"
+                  className="h-full w-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCoverImageUrl("")}
+                  className="absolute top-2 right-2 rounded-full bg-slate-950/80 p-1.5 text-slate-300 transition-colors hover:text-white"
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                    <path
+                      fillRule="evenodd"
+                      d="M5.28 4.22a.75.75 0 00-1.06 1.06L8.94 10l-4.72 4.72a.75.75 0 101.06 1.06L10 11.06l4.72 4.72a.75.75 0 101.06-1.06L11.06 10l4.72-4.72a.75.75 0 00-1.06-1.06L10 8.94 5.28 4.22z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3.5 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800 disabled:opacity-50"
+              >
+                {uploading ? "Uploading..." : "Upload Image"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <span className="text-xs text-slate-500">or paste a URL below</span>
+            </div>
+
             <input
               value={coverImageUrl}
               onChange={(e) => setCoverImageUrl(e.target.value)}
               placeholder="https://..."
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
+              className="mt-2 w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
             />
           </div>
 
@@ -87,7 +154,7 @@ function NewBlogPostForm() {
               rows={10}
               required
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
-              placeholder="Blog post-এর লেখা এখানে দাও..."
+              placeholder="Write the blog post content here..."
             />
           </div>
 
@@ -96,7 +163,7 @@ function NewBlogPostForm() {
             disabled={saving}
             className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg"
           >
-            {saving ? "Saving..." : "Blog Post তৈরি করো"}
+            {saving ? "Saving..." : "Create Blog Post"}
           </button>
         </form>
       </div>

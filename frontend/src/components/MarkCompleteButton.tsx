@@ -187,7 +187,7 @@ export default function MarkCompleteButton({
         disabled
         className="bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg cursor-default"
       >
-        ✅ Completed
+        Completed
       </button>
     );
   }

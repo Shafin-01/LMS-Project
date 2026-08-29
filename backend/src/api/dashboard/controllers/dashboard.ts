@@ -1,37 +1,54 @@
 import { sanitizeUser } from '../../../utils/sanitize-user';
 
+// Only these four roles are part of the platform's actual role system.
+// Strapi's built-in "Public" and "Authenticated" roles exist for the
+// permissions plugin itself and are intentionally excluded from every
+// admin-facing role count, role list and role-change option.
+const MANAGED_ROLE_NAMES = ['Admin', 'Content Manager', 'Instructor', 'Student'];
+
+async function requireAdmin(ctx: any) {
+  const requesterId = ctx.state.user?.id;
+  if (!requesterId) {
+    ctx.forbidden('Login is required.');
+    return null;
+  }
+  const requester: any = await strapi.entityService.findOne(
+    'plugin::users-permissions.user',
+    requesterId,
+    { populate: ['role'] }
+  );
+  if (!requester || requester.role?.name !== 'Admin') {
+    ctx.forbidden('Only an Admin can access this.');
+    return null;
+  }
+  return requester;
+}
+
 export default {
   async stats(ctx: any) {
-    const userId = ctx.state.user?.id;
-    if (!userId) {
-      return ctx.forbidden('লগইন করা বাধ্যতামূলক।');
-    }
-    const user: any = await strapi.entityService.findOne('plugin::users-permissions.user', userId, { populate: ['role'] });
-    if (!user || user.role?.name !== 'Admin') {
-      return ctx.forbidden('শুধু Admin এই তথ্য দেখতে পারবে।');
-    }
+    const requester = await requireAdmin(ctx);
+    if (!requester) return;
+
     const totalCourses = await strapi.db.query('api::course.course').count();
+    const totalLessons = await strapi.db.query('api::lesson.lesson').count();
     const totalEnrollments = await strapi.db.query('api::enrollment.enrollment').count();
     const totalBlogPosts = await strapi.db.query('api::blog-post.blog-post').count();
+
     const allRoles = await strapi.db.query('plugin::users-permissions.role').findMany();
     const usersPerRole: Record<string, number> = {};
     for (const role of allRoles) {
+      if (!MANAGED_ROLE_NAMES.includes(role.name)) continue;
       const count = await strapi.db.query('plugin::users-permissions.user').count({ where: { role: role.id } });
       usersPerRole[role.name] = count;
     }
-    return { totalCourses, totalEnrollments, totalBlogPosts, usersPerRole };
+
+    return { totalCourses, totalLessons, totalEnrollments, totalBlogPosts, usersPerRole };
   },
 
-  // NEW: সব user-এর তালিকা — শুধু Admin দেখতে পারবে
+  // Full user list — Admin only.
   async listUsers(ctx: any) {
-    const requesterId = ctx.state.user?.id;
-    if (!requesterId) {
-      return ctx.forbidden('লগইন করা বাধ্যতামূলক।');
-    }
-    const requester: any = await strapi.entityService.findOne('plugin::users-permissions.user', requesterId, { populate: ['role'] });
-    if (!requester || requester.role?.name !== 'Admin') {
-      return ctx.forbidden('শুধু Admin ইউজার লিস্ট দেখতে পারবে।');
-    }
+    const requester = await requireAdmin(ctx);
+    if (!requester) return;
 
     const users: any[] = await strapi.db.query('plugin::users-permissions.user').findMany({
       populate: ['role'],
@@ -42,53 +59,41 @@ export default {
     return { data: sanitized };
   },
 
-  // NEW: শুধু project-এর কাজের role গুলো (Public/Authenticated বাদ দিয়ে)
+  // Only the platform's own roles (Public/Authenticated excluded), used to
+  // populate the "change role" dropdown.
   async listRoles(ctx: any) {
-    const requesterId = ctx.state.user?.id;
-    if (!requesterId) {
-      return ctx.forbidden('লগইন করা বাধ্যতামূলক।');
-    }
-    const requester: any = await strapi.entityService.findOne('plugin::users-permissions.user', requesterId, { populate: ['role'] });
-    if (!requester || requester.role?.name !== 'Admin') {
-      return ctx.forbidden('শুধু Admin role লিস্ট দেখতে পারবে।');
-    }
+    const requester = await requireAdmin(ctx);
+    if (!requester) return;
 
-    const allowedRoleNames = ['Admin', 'Content Manager', 'Instructor', 'Student'];
     const allRoles: any[] = await strapi.db.query('plugin::users-permissions.role').findMany();
-    const filtered = allRoles.filter((r) => allowedRoleNames.includes(r.name));
+    const filtered = allRoles.filter((r) => MANAGED_ROLE_NAMES.includes(r.name));
 
     return { data: filtered.map((r) => ({ id: r.id, name: r.name })) };
   },
 
-  // NEW: কোনো user-এর role change করা — নিজের role নিজে change করা যাবে না
+  // Change a user's role — an Admin cannot change their own role, so the
+  // platform can never end up with zero Admins by accident.
   async updateUserRole(ctx: any) {
-    const requesterId = ctx.state.user?.id;
-    if (!requesterId) {
-      return ctx.forbidden('লগইন করা বাধ্যতামূলক।');
-    }
-    const requester: any = await strapi.entityService.findOne('plugin::users-permissions.user', requesterId, { populate: ['role'] });
-    if (!requester || requester.role?.name !== 'Admin') {
-      return ctx.forbidden('শুধু Admin role change করতে পারবে।');
-    }
+    const requester = await requireAdmin(ctx);
+    if (!requester) return;
 
     const { userId, roleId } = ctx.request.body || {};
     if (!userId || !roleId) {
-      return ctx.badRequest('userId এবং roleId দুটোই দিতে হবে।');
+      return ctx.badRequest('Both userId and roleId are required.');
     }
 
-    if (String(userId) === String(requesterId)) {
-      return ctx.badRequest('তুমি নিজের role নিজে change করতে পারবে না।');
+    if (String(userId) === String(requester.id)) {
+      return ctx.badRequest('You cannot change your own role.');
     }
 
-    const allowedRoleNames = ['Admin', 'Content Manager', 'Instructor', 'Student'];
     const targetRole: any = await strapi.db.query('plugin::users-permissions.role').findOne({ where: { id: roleId } });
-    if (!targetRole || !allowedRoleNames.includes(targetRole.name)) {
-      return ctx.badRequest('Valid role দিতে হবে (Admin / Content Manager / Instructor / Student)।');
+    if (!targetRole || !MANAGED_ROLE_NAMES.includes(targetRole.name)) {
+      return ctx.badRequest('A valid role is required (Admin / Content Manager / Instructor / Student).');
     }
 
     const targetUser: any = await strapi.db.query('plugin::users-permissions.user').findOne({ where: { id: userId } });
     if (!targetUser) {
-      return ctx.notFound('User পাওয়া যায়নি।');
+      return ctx.notFound('User not found.');
     }
 
     await strapi.db.query('plugin::users-permissions.user').update({
@@ -102,5 +107,31 @@ export default {
     });
 
     return { data: sanitizeUser(updatedUser) };
+  },
+
+  // Delete a user account — an Admin cannot delete their own account, for
+  // the same reason they cannot change their own role: the platform must
+  // always keep at least one Admin able to manage it.
+  async deleteUser(ctx: any) {
+    const requester = await requireAdmin(ctx);
+    if (!requester) return;
+
+    const { userId } = ctx.params || {};
+    if (!userId) {
+      return ctx.badRequest('A userId is required.');
+    }
+
+    if (String(userId) === String(requester.id)) {
+      return ctx.badRequest('You cannot delete your own account.');
+    }
+
+    const targetUser: any = await strapi.db.query('plugin::users-permissions.user').findOne({ where: { id: userId } });
+    if (!targetUser) {
+      return ctx.notFound('User not found.');
+    }
+
+    await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: userId } });
+
+    return { data: { id: Number(userId) } };
   },
 };

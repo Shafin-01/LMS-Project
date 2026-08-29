@@ -1,15 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-export default function RegisterPage() {
+function RegisterForm() {
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const router = useRouter();
+    const searchParams = useSearchParams();
+
+    const rawRedirect = searchParams.get("redirect");
+    const redirectTo = rawRedirect && rawRedirect.startsWith("/") ? rawRedirect : "/";
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -44,7 +48,9 @@ export default function RegisterPage() {
             localStorage.setItem("jwt", data.jwt);
             localStorage.setItem("user", JSON.stringify(fullUser));
 
-            router.push("/");
+            // Send the user back to whichever page sent them here to sign up,
+            // instead of always landing on the home page.
+            router.push(redirectTo);
         } catch (err: any) {
             setError(err.message);
         }
@@ -108,11 +114,26 @@ export default function RegisterPage() {
 
                 <p className="text-center text-sm text-slate-400">
                     Already have an account?{" "}
-                    <Link href="/login" className="text-indigo-400 hover:underline">
+                    <Link
+                        href={
+                            rawRedirect
+                                ? `/login?redirect=${encodeURIComponent(redirectTo)}`
+                                : "/login"
+                        }
+                        className="text-indigo-400 hover:underline"
+                    >
                         Sign In
                     </Link>
                 </p>
             </div>
         </div>
+    );
+}
+
+export default function RegisterPage() {
+    return (
+        <Suspense fallback={null}>
+            <RegisterForm />
+        </Suspense>
     );
 }

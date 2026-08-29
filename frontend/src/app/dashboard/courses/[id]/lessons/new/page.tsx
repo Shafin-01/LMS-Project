@@ -20,11 +20,11 @@ function NewLessonForm({ courseId }: { courseId: string }) {
     setSaving(true);
 
     try {
-      // Lesson এখানে ইচ্ছাকৃতভাবে draft হিসেবেই তৈরি হচ্ছে, auto-publish করা হচ্ছে না —
-      // কারণ Lesson-এর জন্য publish/unpublish action এখনো backend-এ বানানো হয়নি
-      // (এটা পরের ধাপ D.7-এ, Lesson Edit পেজে বানাবো, ঠিক Course-এর মতো)।
-      // Course create করার সময়ও আমরা এভাবেই draft রেখেছিলাম, পরে আলাদাভাবে publish করেছি —
-      // এখানেও একই pattern মেনে চলছি, যাতে "Handler not found" জাতীয় crash না হয়।
+      // The lesson is intentionally created as a draft here, not auto-published —
+      // publishing is handled separately on the Lesson Edit page (via the
+      // publish/unpublish action), the same pattern used for course creation.
+      // Keeping creation and publishing as separate steps keeps this form simple
+      // and consistent with how courses are created.
       await authFetch("/lessons", {
         method: "POST",
         body: JSON.stringify({
@@ -39,7 +39,7 @@ function NewLessonForm({ courseId }: { courseId: string }) {
 
       router.push(`/dashboard/courses/${courseId}`);
     } catch (err: any) {
-      setError(err.message || "Lesson তৈরি করা যায়নি।");
+      setError(err.message || "Failed to create the lesson.");
       setSaving(false);
     }
   };
@@ -51,7 +51,7 @@ function NewLessonForm({ courseId }: { courseId: string }) {
           ← Back to Course
         </Link>
 
-        <h1 className="text-2xl font-bold text-white">নতুন Lesson</h1>
+        <h1 className="text-2xl font-bold text-white">New Lesson</h1>
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg">
@@ -89,7 +89,7 @@ function NewLessonForm({ courseId }: { courseId: string }) {
               onChange={(e) => setContent(e.target.value)}
               rows={6}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
-              placeholder="Lesson-এর লেখা content (video না থাকলে অন্তত এটা দাও)"
+              placeholder="Written lesson content (provide at least this if there's no video)"
             />
           </div>
 
@@ -98,7 +98,7 @@ function NewLessonForm({ courseId }: { courseId: string }) {
             disabled={saving}
             className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg"
           >
-            {saving ? "Saving..." : "Lesson তৈরি করো"}
+            {saving ? "Saving..." : "Create Lesson"}
           </button>
         </form>
       </div>

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/auth";
 import { toBlocks, blocksToText } from "@/lib/api";
 import RoleGuard from "@/components/RoleGuard";
+import { useToast } from "@/components/Toast";
 
 interface LessonItem {
   id: number;
@@ -34,18 +35,19 @@ function CourseManageContent({ courseId }: { courseId: string }) {
   const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
   const [togglingLessonId, setTogglingLessonId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [saveMessage, setSaveMessage] = useState("");
   const router = useRouter();
+  const { showToast } = useToast();
 
   const loadData = async () => {
     setError("");
     try {
-      // Course-এর draft version আনছি (এখানেই সবসময় সবচেয়ে আপ-টু-ডেট Title/Description থাকে)
+      // Fetching the course's draft version, since this always holds the most
+      // up-to-date Title/Description regardless of publish state.
       const draftRes = await authFetch(`/courses/${courseId}?status=draft`);
       const courseDraft = draftRes.data;
 
       if (!courseDraft) {
-        setError("Course পাওয়া যায়নি।");
+        setError("Course not found.");
         setLoading(false);
         return;
       }
@@ -88,7 +90,7 @@ function CourseManageContent({ courseId }: { courseId: string }) {
         }))
       );
     } catch (err: any) {
-      setError(err.message || "Course load করা যায়নি।");
+      setError(err.message || "Failed to load the course.");
     } finally {
       setLoading(false);
     }
@@ -102,7 +104,6 @@ function CourseManageContent({ courseId }: { courseId: string }) {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setSaveMessage("");
     setError("");
 
     try {
@@ -112,10 +113,10 @@ function CourseManageContent({ courseId }: { courseId: string }) {
           data: { Title: title, Description: toBlocks(description) },
         }),
       });
-      setSaveMessage("Course তথ্য update হয়েছে। ✅");
+      showToast("Course information updated.");
       await loadData();
     } catch (err: any) {
-      setError(err.message || "Update করা যায়নি।");
+      showToast(err.message || "Failed to update the course.", "error");
     } finally {
       setSaving(false);
     }
@@ -131,9 +132,10 @@ function CourseManageContent({ courseId }: { courseId: string }) {
       await authFetch(`/courses/${courseId}/actions/${action}`, {
         method: "POST",
       });
+      showToast(action === "publish" ? "Course published." : "Course unpublished.");
       await loadData();
     } catch (err: any) {
-      setError(err.message || "Publish/Unpublish করা যায়নি।");
+      showToast(err.message || "Failed to publish/unpublish the course.", "error");
     } finally {
       setPublishLoading(false);
     }
@@ -142,7 +144,7 @@ function CourseManageContent({ courseId }: { courseId: string }) {
   const handleDeleteCourse = async () => {
     if (
       !window.confirm(
-        "তুমি কি নিশ্চিত এই Course delete করতে চাও? এর ভেতরের সব Lesson ও Quiz-ও delete হয়ে যাবে!"
+        "Are you sure you want to delete this course? All of its lessons and quizzes will be deleted too!"
       )
     )
       return;
@@ -152,7 +154,7 @@ function CourseManageContent({ courseId }: { courseId: string }) {
       await authFetch(`/courses/${courseId}`, { method: "DELETE" });
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message || "Delete করা যায়নি।");
+      showToast(err.message || "Failed to delete the course.", "error");
       setDeletingCourse(false);
     }
   };
@@ -165,24 +167,26 @@ function CourseManageContent({ courseId }: { courseId: string }) {
       await authFetch(`/lessons/${lessonDocId}/actions/${action}`, {
         method: "POST",
       });
+      showToast(action === "publish" ? "Lesson published." : "Lesson unpublished.");
       await loadData();
     } catch (err: any) {
-      setError(err.message || "Lesson Publish/Unpublish করা যায়নি।");
+      showToast(err.message || "Failed to publish/unpublish the lesson.", "error");
     } finally {
       setTogglingLessonId(null);
     }
   };
 
   const handleDeleteLesson = async (lessonDocId: string) => {
-    if (!window.confirm("এই lesson delete করতে চাও? এর quiz question গুলোও delete হয়ে যাবে!"))
+    if (!window.confirm("Delete this lesson? Its quiz questions will be deleted too!"))
       return;
 
     setDeletingLessonId(lessonDocId);
     try {
       await authFetch(`/lessons/${lessonDocId}`, { method: "DELETE" });
+      showToast("Lesson deleted.");
       await loadData();
     } catch (err: any) {
-      setError(err.message || "Lesson delete করা যায়নি।");
+      showToast(err.message || "Failed to delete the lesson.", "error");
     } finally {
       setDeletingLessonId(null);
     }
@@ -199,7 +203,7 @@ function CourseManageContent({ courseId }: { courseId: string }) {
   if (!course) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-red-400">{error || "Course পাওয়া যায়নি।"}</p>
+        <p className="text-red-400">{error || "Course not found."}</p>
         <Link href="/dashboard" className="text-sm text-indigo-400 hover:underline">
           ← Back to Dashboard
         </Link>
@@ -232,7 +236,7 @@ function CourseManageContent({ courseId }: { courseId: string }) {
             <button
               onClick={handleTogglePublish}
               disabled={publishLoading}
-              className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg"
+              className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800 disabled:opacity-50"
             >
               {publishLoading
                 ? "..."
@@ -278,16 +282,13 @@ function CourseManageContent({ courseId }: { courseId: string }) {
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
             />
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={saving}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg"
-            >
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
-            {saveMessage && <span className="text-xs text-slate-400">{saveMessage}</span>}
-          </div>
+          <button
+            type="submit"
+            disabled={saving}
+            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg"
+          >
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
         </form>
 
         <div className="space-y-3">
@@ -303,7 +304,7 @@ function CourseManageContent({ courseId }: { courseId: string }) {
 
           {lessons.length === 0 ? (
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-slate-400 text-sm">
-              এখনো কোনো lesson যোগ করা হয়নি।
+              No lessons have been added yet.
             </div>
           ) : (
             <div className="space-y-2">
@@ -326,7 +327,7 @@ function CourseManageContent({ courseId }: { courseId: string }) {
                       {lesson.isPublished ? "Published" : "Draft"}
                     </span>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() =>
                         handleToggleLessonPublish(lesson.documentId, lesson.isPublished)
@@ -342,14 +343,14 @@ function CourseManageContent({ courseId }: { courseId: string }) {
                     </button>
                     <Link
                       href={`/dashboard/courses/${courseId}/lessons/${lesson.documentId}`}
-                      className="text-sm text-indigo-400 hover:underline px-2"
+                      className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800"
                     >
-                      Edit / Quiz →
+                      Edit / Quiz
                     </Link>
                     <button
                       onClick={() => handleDeleteLesson(lesson.documentId)}
                       disabled={deletingLessonId === lesson.documentId}
-                      className="text-sm text-red-400 hover:text-red-300 disabled:opacity-50 px-2"
+                      className="text-xs font-medium text-red-400 hover:text-red-300 disabled:opacity-50 px-2"
                     >
                       {deletingLessonId === lesson.documentId ? "..." : "Delete"}
                     </button>

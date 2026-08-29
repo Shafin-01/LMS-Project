@@ -2,7 +2,7 @@
 
 import React, { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { authFetch, getUser } from "@/lib/auth";
 import LessonProgress from "@/components/LessonProgress";
 import MarkCompleteButton from "@/components/MarkCompleteButton";
@@ -40,6 +40,7 @@ export default function LessonPage({
 }) {
   const resolvedParams = use(params);
   const router = useRouter();
+  const pathname = usePathname();
 
   const [mounted, setMounted] = useState(false);
   const [role, setRole] = useState<string | null>(null);
@@ -63,13 +64,15 @@ export default function LessonPage({
     const user = getUser();
 
     if (!user) {
-      router.push("/login");
+      // Send the user to login, then straight back to this lesson once
+      // they're signed in, instead of dropping them on the home page.
+      router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
       return;
     }
 
     setRole(user.role?.name || null);
     setRoleChecked(true);
-  }, [router]);
+  }, [router, pathname]);
 
   const isManagement = role !== null && MANAGEMENT_ROLES.includes(role);
 

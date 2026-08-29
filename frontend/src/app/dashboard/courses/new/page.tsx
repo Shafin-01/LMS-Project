@@ -19,7 +19,7 @@ function NewCourseForm() {
     setError("");
 
     if (!title.trim()) {
-      setError("Title দিতে হবে।");
+      setError("A Title is required.");
       return;
     }
 
@@ -38,7 +38,7 @@ function NewCourseForm() {
 
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err?.message || "Course তৈরি করা যায়নি।");
+      setError(err?.message || "Failed to create the course.");
     } finally {
       setLoading(false);
     }
@@ -59,8 +59,8 @@ function NewCourseForm() {
             New Course
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            নতুন course তৈরি হওয়ার পর draft অবস্থায় থাকবে — publish করার আগে
-            student-রা এটা দেখতে পাবে না।
+            A new course starts in draft status — students won't be able to
+            see it until you publish it.
           </p>
         </div>
 
@@ -84,7 +84,7 @@ function NewCourseForm() {
               onChange={(e) => setTitle(e.target.value)}
               required
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
-              placeholder="যেমন: Introduction to Data Structures"
+              placeholder="e.g. Introduction to Data Structures"
             />
           </div>
 
@@ -97,7 +97,7 @@ function NewCourseForm() {
               onChange={(e) => setDescription(e.target.value)}
               rows={5}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 resize-y"
-              placeholder="এই course-এ কী শেখানো হবে সংক্ষেপে লিখো..."
+              placeholder="Briefly describe what this course will teach..."
             />
           </div>
 
@@ -106,7 +106,7 @@ function NewCourseForm() {
             disabled={loading}
             className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors"
           >
-            {loading ? "তৈরি হচ্ছে..." : "Create Course"}
+            {loading ? "Creating..." : "Create Course"}
           </button>
         </form>
       </div>

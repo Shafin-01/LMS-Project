@@ -31,6 +31,19 @@ function blocksExcerpt(body: any, maxLength = 160): string {
   return "";
 }
 
+function AuthorByline({ author }: { author?: BlogAuthor | null }) {
+  if (!author?.username) return null;
+
+  return (
+    <div className="flex items-center gap-2 pt-1">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-[11px] font-semibold text-indigo-300">
+        {author.username[0]?.toUpperCase()}
+      </span>
+      <span className="text-xs font-medium text-slate-500">{author.username}</span>
+    </div>
+  );
+}
+
 export default async function BlogListPage() {
   let posts: BlogPost[] = [];
 
@@ -50,36 +63,55 @@ export default async function BlogListPage() {
           ← Back to Home
         </Link>
 
-        <div>
+        <div className="space-y-2">
+          <span className="inline-block rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-400">
+            From the team
+          </span>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white">Blog</h1>
-          <p className="text-slate-400 mt-2">সর্বশেষ articles আর updates।</p>
+          <p className="text-slate-400">
+            Notes on teaching, learning, and what we're building on the platform.
+          </p>
         </div>
 
         {posts.length === 0 ? (
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-slate-400">
-            এখনো কোনো blog post প্রকাশিত হয়নি।
+            No articles have been published yet — check back soon.
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          // auto-fit lets cards stretch to fill the row instead of leaving
+          // empty grid tracks when there are only one or two posts.
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6">
             {posts.map((post) => (
               <Link
                 key={post.id}
                 href={`/blog/${post.documentId || post.id}`}
-                className="flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-slate-700 transition-colors"
+                className="group flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-slate-700 transition-colors"
               >
-                {post.CoverImageURL && (
+                {post.CoverImageURL ? (
                   <img
                     src={post.CoverImageURL}
                     alt={post.Title}
-                    className="w-full h-40 object-cover"
+                    className="h-44 w-full object-cover"
                   />
+                ) : (
+                  <div className="h-44 w-full bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-900 flex items-center justify-center">
+                    <span className="text-2xl font-extrabold text-indigo-500/30">LMS</span>
+                  </div>
                 )}
-                <div className="p-5 space-y-2">
-                  <h2 className="text-lg font-bold text-white">{post.Title}</h2>
-                  <p className="text-sm text-slate-400 line-clamp-3">{blocksExcerpt(post.Body)}</p>
-                  {post.author?.username && (
-                    <p className="text-xs text-slate-500 pt-1">— {post.author.username}</p>
-                  )}
+                <div className="flex flex-1 flex-col p-5 space-y-2">
+                  <h2 className="text-lg font-bold text-white group-hover:text-indigo-300 transition-colors">
+                    {post.Title}
+                  </h2>
+                  <p className="text-sm text-slate-400 line-clamp-3 flex-1">
+                    {blocksExcerpt(post.Body)}
+                  </p>
+                  <AuthorByline author={post.author} />
+                  <span className="mt-3 inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-700 px-3.5 py-2 text-sm font-medium text-indigo-300 transition-colors group-hover:border-indigo-500/40 group-hover:bg-indigo-500/10">
+                    Read article
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
+                    </svg>
+                  </span>
                 </div>
               </Link>
             ))}

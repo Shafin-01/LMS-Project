@@ -9,7 +9,7 @@ export default factories.createCoreController(
 
       if (!user) {
         return ctx.unauthorized(
-          'Lesson দেখতে হলে আগে login করতে হবে।'
+          'You must log in to view this lesson.'
         );
       }
 
@@ -17,7 +17,7 @@ export default factories.createCoreController(
 
       if (!lessonId) {
         return ctx.badRequest(
-          'Valid lessonId দিতে হবে।'
+          'A valid lessonId is required.'
         );
       }
 
@@ -30,7 +30,7 @@ export default factories.createCoreController(
 
       if (!lesson) {
         return ctx.notFound(
-          'Lesson পাওয়া যায়নি।'
+          'Lesson not found.'
         );
       }
 
@@ -41,7 +41,7 @@ export default factories.createCoreController(
 
         if (!courseDocumentId) {
           return ctx.forbidden(
-            'এই lesson কোনো valid course-এর সাথে যুক্ত নয়।'
+            'This lesson is not linked to a valid course.'
           );
         }
 
@@ -56,15 +56,15 @@ export default factories.createCoreController(
 
         if (enrollments.length === 0) {
           return ctx.forbidden(
-            'এই lesson দেখতে হলে আগে এই course-এ enroll করতে হবে।'
+            'You need to enroll in this course before you can view this lesson.'
           );
         }
       }
 
-      // Student-দের কাছে quiz-এর সঠিক উত্তর leak হওয়া থেকে বাঁচাতে —
-      // quiz.ts controller-এ এই সুরক্ষা আগে থেকেই ছিল, কিন্তু এখানে lesson-এর
-      // populate দিয়ে quiz আনার সময় সেটা bypass হয়ে যাচ্ছিল। এখন এখানেও একই
-      // সুরক্ষা যোগ করা হলো।
+      // Strips the correct answer out of each quiz for a Student, so it can
+      // never leak. The quiz.ts controller already had this protection, but
+      // it was being bypassed here because this endpoint populates quizzes
+      // directly through the lesson — so the same protection is applied here too.
       const responseLesson: any = { ...lesson };
 
       if (roleName === 'Student' && Array.isArray(responseLesson.quizzes)) {
@@ -81,20 +81,20 @@ export default factories.createCoreController(
       const user = ctx.state.user;
 
       if (!user) {
-        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+        return ctx.unauthorized('Login is required.');
       }
 
       const roleName = user.role?.name;
 
       if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-        return ctx.forbidden('তোমার lesson তৈরি করার permission নেই।');
+        return ctx.forbidden('You do not have permission to create a lesson.');
       }
 
       const requestData = ctx.request.body?.data || {};
       const courseDocId = requestData.course;
 
       if (!courseDocId) {
-        return ctx.badRequest('Lesson-এর সাথে একটি course দিতে হবে।');
+        return ctx.badRequest('A course must be provided for the lesson.');
       }
 
       if (roleName === 'Instructor') {
@@ -106,11 +106,11 @@ export default factories.createCoreController(
           });
 
         if (!course) {
-          return ctx.notFound('Course পাওয়া যায়নি।');
+          return ctx.notFound('Course not found.');
         }
 
         if (course.instructor?.id !== user.id) {
-          return ctx.forbidden('তুমি শুধু নিজের course-এ lesson যোগ করতে পারবে।');
+          return ctx.forbidden('You can only add lessons to your own courses.');
         }
       }
 
@@ -130,13 +130,13 @@ export default factories.createCoreController(
       const user = ctx.state.user;
 
       if (!user) {
-        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+        return ctx.unauthorized('Login is required.');
       }
 
       const roleName = user.role?.name;
 
       if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-        return ctx.forbidden('তোমার lesson edit করার permission নেই।');
+        return ctx.forbidden('You do not have permission to edit lessons.');
       }
 
       const existingLesson = await strapi
@@ -147,14 +147,14 @@ export default factories.createCoreController(
         });
 
       if (!existingLesson) {
-        return ctx.notFound('Lesson পাওয়া যায়নি।');
+        return ctx.notFound('Lesson not found.');
       }
 
       if (
         roleName === 'Instructor' &&
         existingLesson.course?.instructor?.id !== user.id
       ) {
-        return ctx.forbidden('তুমি শুধু নিজের course-এর lesson edit করতে পারবে।');
+        return ctx.forbidden('You can only edit lessons in your own courses.');
       }
 
       const requestData = ctx.request.body?.data || {};
@@ -176,13 +176,13 @@ export default factories.createCoreController(
       const user = ctx.state.user;
 
       if (!user) {
-        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+        return ctx.unauthorized('Login is required.');
       }
 
       const roleName = user.role?.name;
 
       if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-        return ctx.forbidden('তোমার lesson delete করার permission নেই।');
+        return ctx.forbidden('You do not have permission to delete lessons.');
       }
 
       if (roleName === 'Instructor') {
@@ -194,11 +194,11 @@ export default factories.createCoreController(
           });
 
         if (!lesson) {
-          return ctx.notFound('Lesson পাওয়া যায়নি।');
+          return ctx.notFound('Lesson not found.');
         }
 
         if (lesson.course?.instructor?.id !== user.id) {
-          return ctx.forbidden('তুমি শুধু নিজের course-এর lesson delete করতে পারবে।');
+          return ctx.forbidden('You can only delete lessons in your own courses.');
         }
       }
 
@@ -209,13 +209,13 @@ export default factories.createCoreController(
       const user = ctx.state.user;
 
       if (!user) {
-        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+        return ctx.unauthorized('Login is required.');
       }
 
       const roleName = user.role?.name;
 
       if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-        return ctx.forbidden('তোমার এই permission নেই।');
+        return ctx.forbidden('You do not have this permission.');
       }
 
       const { id } = ctx.params;
@@ -228,11 +228,11 @@ export default factories.createCoreController(
         });
 
       if (!lesson) {
-        return ctx.notFound('Lesson পাওয়া যায়নি।');
+        return ctx.notFound('Lesson not found.');
       }
 
       if (roleName === 'Instructor' && lesson.course?.instructor?.id !== user.id) {
-        return ctx.forbidden('তুমি শুধু নিজের course-এর lesson-ই publish করতে পারবে।');
+        return ctx.forbidden('You can only publish lessons in your own courses.');
       }
 
       await strapi.documents('api::lesson.lesson').publish({ documentId: id });
@@ -248,13 +248,13 @@ export default factories.createCoreController(
       const user = ctx.state.user;
 
       if (!user) {
-        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+        return ctx.unauthorized('Login is required.');
       }
 
       const roleName = user.role?.name;
 
       if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-        return ctx.forbidden('তোমার এই permission নেই।');
+        return ctx.forbidden('You do not have this permission.');
       }
 
       const { id } = ctx.params;
@@ -267,11 +267,11 @@ export default factories.createCoreController(
         });
 
       if (!lesson) {
-        return ctx.notFound('Lesson পাওয়া যায়নি।');
+        return ctx.notFound('Lesson not found.');
       }
 
       if (roleName === 'Instructor' && lesson.course?.instructor?.id !== user.id) {
-        return ctx.forbidden('তুমি শুধু নিজের course-এর lesson-ই unpublish করতে পারবে।');
+        return ctx.forbidden('You can only unpublish lessons in your own courses.');
       }
 
       await strapi.documents('api::lesson.lesson').unpublish({ documentId: id });
@@ -289,15 +289,15 @@ export default factories.createCoreController(
       const { answers } = ctx.request.body || {};
 
       if (!user) {
-        return ctx.unauthorized('Login করা লাগবে।');
+        return ctx.unauthorized('Login is required.');
       }
 
       if (user.role?.name !== 'Student') {
-        return ctx.forbidden('শুধুমাত্র Student quiz submit করতে পারবে।');
+        return ctx.forbidden('Only a Student can submit a quiz.');
       }
 
       if (!answers) {
-        return ctx.badRequest('answers পাঠাতে হবে।');
+        return ctx.badRequest('Answers are required.');
       }
 
       const lesson = await strapi
@@ -308,13 +308,13 @@ export default factories.createCoreController(
         });
 
       if (!lesson) {
-        return ctx.notFound('Lesson পাওয়া যায়নি।');
+        return ctx.notFound('Lesson not found.');
       }
 
       const courseDocumentId = lesson.course?.documentId;
 
       if (!courseDocumentId) {
-        return ctx.forbidden('এই lesson কোনো valid course-এর সাথে যুক্ত নয়।');
+        return ctx.forbidden('This lesson is not linked to a valid course.');
       }
 
       const enrollments = await strapi
@@ -327,11 +327,11 @@ export default factories.createCoreController(
         });
 
       if (enrollments.length === 0) {
-        return ctx.forbidden('Quiz দিতে হলে আগে এই course-এ enroll করতে হবে।');
+        return ctx.forbidden('You need to enroll in this course before you can take the quiz.');
       }
 
-      // একবার quiz দিয়ে ফেললে আর দ্বিতীয়বার দেওয়া যাবে না — সরাসরি API call
-      // করলেও যাতে ব্লক থাকে, তাই এই চেক backend-এই রাখা হচ্ছে, শুধু frontend-এ না।
+      // A quiz can only be attempted once — this check lives on the backend
+      // (not just the frontend) so a direct API call can't bypass it either.
       const existingResults = await strapi
         .documents('api::quiz-result.quiz-result')
         .findMany({
@@ -342,7 +342,7 @@ export default factories.createCoreController(
         });
 
       if (existingResults && existingResults.length > 0) {
-        return ctx.forbidden('তুমি ইতিমধ্যে এই quiz দিয়ে ফেলেছ, আবার দেওয়া যাবে না।');
+        return ctx.forbidden('You have already taken this quiz — it cannot be retaken.');
       }
 
       const quizzes = await strapi
@@ -352,7 +352,7 @@ export default factories.createCoreController(
         });
 
       if (!quizzes || quizzes.length === 0) {
-        return ctx.badRequest('এই lesson-এ কোনো quiz নেই।');
+        return ctx.badRequest('This lesson does not have a quiz.');
       }
 
       let score = 0;
@@ -385,19 +385,20 @@ export default factories.createCoreController(
       };
     },
 
-    // Student আগে quiz দিয়ে থাকলে তার score + প্রতিটা প্রশ্নের সঠিক উত্তর ও
-    // নিজের দেওয়া উত্তর একসাথে ফেরত দেয় — review দেখানোর জন্য। এখানে
-    // CorrectAnswer দেওয়া নিরাপদ, কারণ এটা শুধু তখনই দেখানো হয় যখন সেই
-    // student ইতিমধ্যে quiz জমা দিয়ে ফেলেছে (আর দিতে পারবে না)।
+    // If the Student has already taken the quiz, returns their score along
+    // with each question's correct answer and their own submitted answer —
+    // for the review screen. Including CorrectAnswer here is safe because it
+    // is only ever shown once that student has already submitted the quiz
+    // (and can no longer retake it).
     async myQuizResult(ctx) {
       const user = ctx.state.user;
 
       if (!user) {
-        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+        return ctx.unauthorized('Login is required.');
       }
 
       if (user.role?.name !== 'Student') {
-        return ctx.forbidden('শুধুমাত্র Student-এর নিজের quiz result এভাবে দেখা যাবে।');
+        return ctx.forbidden('Only a Student can view their own quiz result this way.');
       }
 
       const { id } = ctx.params;
@@ -407,7 +408,7 @@ export default factories.createCoreController(
         .findOne({ documentId: id });
 
       if (!lesson) {
-        return ctx.notFound('Lesson পাওয়া যায়নি।');
+        return ctx.notFound('Lesson not found.');
       }
 
       const results = await strapi

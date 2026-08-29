@@ -2,8 +2,8 @@ import { factories } from '@strapi/strapi';
 
 export default factories.createCoreController('api::quiz.quiz', ({ strapi }) => ({
 
-  // Student / not-logged-in কাউকে CorrectAnswer field দেখানো হবে না,
-  // যাতে quiz দেওয়ার আগেই উত্তর leak না হয়।
+  // The CorrectAnswer field is never shown to a Student or a logged-out
+  // visitor, so the answer can't leak before the quiz is taken.
   async find(ctx) {
     const response: any = await super.find(ctx);
     const user = ctx.state.user;
@@ -40,13 +40,13 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }) => 
     const user = ctx.state.user;
 
     if (!user) {
-      return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      return ctx.unauthorized('Login is required.');
     }
 
     const roleName = user.role?.name;
 
     if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-      return ctx.forbidden('তোমার quiz তৈরি করার permission নেই।');
+      return ctx.forbidden('You do not have permission to create a quiz.');
     }
 
     if (roleName === 'Instructor') {
@@ -56,16 +56,16 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }) => 
         populate: { course: { populate: ['instructor'] } },
       });
       if (!lesson || lesson.course?.instructor?.id !== user.id) {
-        return ctx.forbidden('তুমি শুধু নিজের course এর quiz বানাতে পারবে।');
+        return ctx.forbidden('You can only create quizzes for your own courses.');
       }
     }
 
     const response: any = await super.create(ctx);
 
-    // Quiz question-এর জন্য আলাদা করে কোনো Publish বাটন রাখছি না —
-    // এটা শুধু Lesson-এর ভেতরের ছোট sub-content, নিজে থেকে draft/publish
-    // manage করার দরকার নেই। তাই তৈরি হওয়ার সাথে সাথেই publish করে দিচ্ছি,
-    // যাতে student-এর submitQuiz() সাথে সাথেই এই question ধরতে পারে।
+    // A quiz question has no separate Publish button in the UI — it's a
+    // small piece of sub-content inside a Lesson, not something that needs
+    // its own draft/publish workflow. So it's published immediately on
+    // creation, so a Student's submitQuiz() can pick it up right away.
     const documentId = response?.data?.documentId;
     if (documentId) {
       await strapi.documents('api::quiz.quiz').publish({ documentId });
@@ -78,13 +78,13 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }) => 
     const user = ctx.state.user;
 
     if (!user) {
-      return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      return ctx.unauthorized('Login is required.');
     }
 
     const roleName = user.role?.name;
 
     if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-      return ctx.forbidden('তোমার quiz edit করার permission নেই।');
+      return ctx.forbidden('You do not have permission to edit quizzes.');
     }
 
     if (roleName === 'Instructor') {
@@ -93,14 +93,15 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }) => 
         populate: { lesson: { populate: { course: { populate: ['instructor'] } } } },
       });
       if (!quiz || quiz.lesson?.course?.instructor?.id !== user.id) {
-        return ctx.forbidden('তুমি শুধু নিজের course এর quiz edit করতে পারবে।');
+        return ctx.forbidden('You can only edit quizzes for your own courses.');
       }
     }
 
     const response: any = await super.update(ctx);
 
-    // Update করার পরও আবার publish করছি, নাহলে edit করা answer/question
-    // published version-এ reflect হবে না, আর student পুরনো version দেখেই থেকে যাবে।
+    // Published again after every update, otherwise an edited
+    // answer/question wouldn't be reflected in the published version, and a
+    // Student would keep seeing the old version.
     const documentId = ctx.params.id;
     if (documentId) {
       await strapi.documents('api::quiz.quiz').publish({ documentId });
@@ -113,13 +114,13 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }) => 
     const user = ctx.state.user;
 
     if (!user) {
-      return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      return ctx.unauthorized('Login is required.');
     }
 
     const roleName = user.role?.name;
 
     if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-      return ctx.forbidden('তোমার quiz delete করার permission নেই।');
+      return ctx.forbidden('You do not have permission to delete quizzes.');
     }
 
     if (roleName === 'Instructor') {
@@ -128,7 +129,7 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }) => 
         populate: { lesson: { populate: { course: { populate: ['instructor'] } } } },
       });
       if (!quiz || quiz.lesson?.course?.instructor?.id !== user.id) {
-        return ctx.forbidden('তুমি শুধু নিজের course এর quiz delete করতে পারবে।');
+        return ctx.forbidden('You can only delete quizzes for your own courses.');
       }
     }
     return super.delete(ctx);

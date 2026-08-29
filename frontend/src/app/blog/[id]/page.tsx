@@ -48,7 +48,7 @@ export default async function BlogDetailPage({
   if (!post) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6">
-        <h1 className="text-2xl font-bold mb-4">Blog post পাওয়া যায়নি</h1>
+        <h1 className="text-2xl font-bold mb-4">Blog post not found</h1>
         <Link href="/blog" className="text-indigo-400 hover:underline">
           ← Back to Blog
         </Link>
@@ -76,7 +76,7 @@ export default async function BlogDetailPage({
         <div className="space-y-2">
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white">{post.Title}</h1>
           {post.author?.username && (
-            <p className="text-sm text-slate-500">লিখেছেন — {post.author.username}</p>
+            <p className="text-sm text-slate-500">By {post.author.username}</p>
           )}
         </div>
 

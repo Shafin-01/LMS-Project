@@ -1,14 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-export default function LoginPage() {
+function LoginForm() {
     const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const router = useRouter();
+    const searchParams = useSearchParams();
+
+    // Only accept an internal path as the post-login destination, so a
+    // crafted "redirect" query value can never send the user off-site.
+    const rawRedirect = searchParams.get("redirect");
+    const redirectTo = rawRedirect && rawRedirect.startsWith("/") ? rawRedirect : "/";
+
+    // Set by IdleLogout when a session was ended automatically, so the
+    // user understands why they landed back on the login page instead of
+    // wondering if something went wrong.
+    const loggedOutForInactivity = searchParams.get("reason") === "idle";
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -49,7 +60,7 @@ export default function LoginPage() {
 
             if (!meRes.ok) {
                 throw new Error(
-                    "User information load করা যায়নি।"
+                    "Could not load your account information."
                 );
             }
 
@@ -61,10 +72,12 @@ export default function LoginPage() {
                 JSON.stringify(fullUser)
             );
 
-            router.push("/");
+            // Send the user back to whichever page sent them to log in,
+            // instead of always landing on the home page.
+            router.push(redirectTo);
         } catch (err: any) {
             setError(
-                err?.message || "Login করা যায়নি।"
+                err?.message || "Login failed. Please try again."
             );
         }
     };
@@ -81,6 +94,12 @@ export default function LoginPage() {
                         Sign in to your LMS account
                     </p>
                 </div>
+
+                {loggedOutForInactivity && !error && (
+                    <div className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-sm p-3 rounded-lg text-center">
+                        You were logged out after a period of inactivity. Please log in again.
+                    </div>
+                )}
 
                 {error && (
                     <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg text-center">
@@ -137,7 +156,11 @@ export default function LoginPage() {
                 <p className="text-center text-sm text-slate-400">
                     Don't have an account?{" "}
                     <Link
-                        href="/register"
+                        href={
+                            rawRedirect
+                                ? `/register?redirect=${encodeURIComponent(redirectTo)}`
+                                : "/register"
+                        }
                         className="text-indigo-400 hover:underline"
                     >
                         Sign Up
@@ -145,5 +168,13 @@ export default function LoginPage() {
                 </p>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={null}>
+            <LoginForm />
+        </Suspense>
     );
 }

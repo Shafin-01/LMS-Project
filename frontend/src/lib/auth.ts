@@ -94,14 +94,14 @@ export async function authFetch(
   if (!res.ok) {
     if (res.status === 401) {
       throw new Error(
-        "তোমার session শেষ হয়ে গেছে। আবার login করো।"
+        "Your session has expired. Please log in again."
       );
     }
 
     if (res.status === 403) {
       throw new Error(
         data?.error?.message ||
-          "এই কাজ করার permission তোমার নেই।"
+          "You do not have permission to do this."
       );
     }
 
@@ -112,4 +112,52 @@ export async function authFetch(
   }
 
   return data;
+}
+
+/**
+ * Uploads a single file to Strapi's built-in Upload plugin and returns the
+ * uploaded file's fully-qualified URL. This lets a form offer a real
+ * "Upload Image" button instead of asking the user to manually copy a URL
+ * from the Strapi Media Library.
+ *
+ * This intentionally does NOT reuse authFetch(): a multipart/form-data
+ * request must not have its Content-Type header set manually, since the
+ * browser needs to generate the correct boundary value itself.
+ */
+export async function uploadImage(file: File): Promise<string> {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_STRAPI_API_URL ||
+    "http://localhost:1337";
+
+  const token = getToken();
+  const formData = new FormData();
+  formData.append("files", file);
+
+  const res = await fetch(`${baseUrl}/api/upload`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: formData,
+  });
+
+  const data = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    if (res.status === 403) {
+      throw new Error(
+        "You do not have permission to upload files. Ask an Admin to enable the Upload permission for your role."
+      );
+    }
+    throw new Error(data?.error?.message || "Image upload failed. Please try again.");
+  }
+
+  // Strapi's /api/upload endpoint returns an array of uploaded file objects.
+  const uploaded = Array.isArray(data) ? data[0] : null;
+
+  if (!uploaded?.url) {
+    throw new Error("Image upload succeeded but no file URL was returned.");
+  }
+
+  // The local Upload provider returns a relative path (e.g. "/uploads/photo.jpg").
+  // An absolute URL is needed so the image renders directly in an <img> tag.
+  return uploaded.url.startsWith("http") ? uploaded.url : `${baseUrl}${uploaded.url}`;
 }

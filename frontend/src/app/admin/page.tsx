@@ -7,6 +7,7 @@ import RoleGuard from "@/components/RoleGuard";
 
 interface DashboardStats {
   totalCourses: number;
+  totalLessons: number;
   totalEnrollments: number;
   totalBlogPosts: number;
   usersPerRole: Record<string, number>;
@@ -27,6 +28,11 @@ interface RoleOption {
   name: string;
 }
 
+// Fixed display order for the role-count cards, so they stay in a stable,
+// predictable position instead of shuffling based on database insertion
+// order every time the page reloads.
+const ROLE_DISPLAY_ORDER = ["Admin", "Instructor", "Content Manager", "Student"];
+
 function AdminPanelContent() {
   const currentUser = getUser();
 
@@ -36,6 +42,7 @@ function AdminPanelContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingUserId, setUpdatingUserId] = useState<number | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
 
   const loadData = async () => {
     setError("");
@@ -79,6 +86,22 @@ function AdminPanelContent() {
     }
   };
 
+  const handleDeleteUser = async (userId: number, username: string) => {
+    if (!window.confirm(`Delete the account "${username}"? This cannot be undone.`)) {
+      return;
+    }
+    setDeletingUserId(userId);
+    setError("");
+    try {
+      await authFetch(`/dashboard/users/${userId}`, { method: "DELETE" });
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || "Failed to delete user.");
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
   if (loading) {
     return (
       <main className="min-h-screen text-slate-100 flex items-center justify-center">
@@ -89,7 +112,7 @@ function AdminPanelContent() {
 
   return (
     <main className="min-h-screen text-slate-100 pb-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto space-y-8 pt-8">
+      <div className="max-w-5xl mx-auto space-y-10 pt-8">
         <div>
           <Link href="/dashboard" className="text-sm text-indigo-400 hover:underline">
             ← Back to Dashboard
@@ -104,36 +127,53 @@ function AdminPanelContent() {
         )}
 
         {stats && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-white">Overview</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <p className="text-slate-400 text-sm">Total Courses</p>
-                <p className="text-2xl font-bold text-white">{stats.totalCourses}</p>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <p className="text-slate-400 text-sm">Total Enrollments</p>
-                <p className="text-2xl font-bold text-white">{stats.totalEnrollments}</p>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <p className="text-slate-400 text-sm">Total Blog Posts</p>
-                <p className="text-2xl font-bold text-white">{stats.totalBlogPosts}</p>
+          <>
+            {/* Section 1: platform content — how much has been built so far. */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-white">Platform Content</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <p className="text-slate-400 text-sm">Courses</p>
+                  <p className="text-2xl font-bold text-white">{stats.totalCourses}</p>
+                </div>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <p className="text-slate-400 text-sm">Lessons</p>
+                  <p className="text-2xl font-bold text-white">{stats.totalLessons}</p>
+                </div>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <p className="text-slate-400 text-sm">Blog Posts</p>
+                  <p className="text-2xl font-bold text-white">{stats.totalBlogPosts}</p>
+                </div>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <p className="text-slate-400 text-sm">Enrollments</p>
+                  <p className="text-2xl font-bold text-white">{stats.totalEnrollments}</p>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {Object.entries(stats.usersPerRole).map(([roleName, count]) => (
-                <div key={roleName} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                  <p className="text-slate-400 text-sm">{roleName}</p>
-                  <p className="text-xl font-bold text-white">{count}</p>
-                </div>
-              ))}
+            {/* Section 2: how many accounts exist per role. Strapi's own
+                built-in "Public" and "Authenticated" roles are excluded on
+                the backend, so only the platform's four real roles show up. */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-white">Users by Role</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {ROLE_DISPLAY_ORDER.map((roleName) => (
+                  <div key={roleName} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                    <p className="text-slate-400 text-sm">{roleName}</p>
+                    <p className="text-xl font-bold text-white">{stats.usersPerRole[roleName] ?? 0}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          </>
         )}
 
+        {/* Section 3: manage individual accounts — change role or remove
+            the account entirely. An Admin's own row has no role dropdown
+            or delete action, so the platform can never end up without an
+            Admin able to manage it. */}
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-white">Users ({users.length})</h2>
+          <h2 className="text-lg font-semibold text-white">Users & Roles ({users.length})</h2>
           <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -142,6 +182,7 @@ function AdminPanelContent() {
                   <th className="p-3">Email</th>
                   <th className="p-3">Current Role</th>
                   <th className="p-3">Change Role</th>
+                  <th className="p-3">Delete</th>
                 </tr>
               </thead>
               <tbody>
@@ -171,6 +212,17 @@ function AdminPanelContent() {
                               </option>
                             ))}
                           </select>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {!isSelf && (
+                          <button
+                            onClick={() => handleDeleteUser(u.id, u.username)}
+                            disabled={deletingUserId === u.id}
+                            className="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-red-900/50 text-slate-300 hover:text-red-300 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {deletingUserId === u.id ? "Deleting…" : "Delete"}
+                          </button>
                         )}
                       </td>
                     </tr>

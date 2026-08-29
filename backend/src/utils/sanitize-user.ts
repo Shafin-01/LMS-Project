@@ -1,14 +1,14 @@
 /**
- * Populated user relation (student/instructor/author ইত্যাদি) থেকে
- * password hash এবং reset/confirmation token-এর মতো sensitive field
- * বাদ দিয়ে একটা নিরাপদ object রিটার্ন করে।
+ * Returns a safe copy of a populated user relation (student/instructor/
+ * author, etc.) with sensitive fields — the password hash and the reset/
+ * confirmation tokens — stripped out.
  *
- * কেন দরকার: strapi.documents(...).findMany()/findOne() দিয়ে সরাসরি
- * populate করা relation নিজে থেকে sanitize হয় না (super.find()-এর
- * মতো automatic sanitization এখানে কাজ করে না) — তাই raw response-এ
- * populated user-এর password hash-ও চলে আসতে পারে। এই function দিয়ে
- * প্রতিটা populated user relation client-এ পাঠানোর আগে পরিষ্কার করে
- * নিতে হবে।
+ * Why this is needed: a relation populated directly through
+ * strapi.documents(...).findMany()/findOne() is not sanitized
+ * automatically (the automatic sanitization that super.find() does isn't
+ * applied here) — so the raw response could include a populated user's
+ * password hash. Every populated user relation needs to be passed through
+ * this function before it's sent to the client.
  */
 export function sanitizeUser(user: any): any {
   if (!user) {

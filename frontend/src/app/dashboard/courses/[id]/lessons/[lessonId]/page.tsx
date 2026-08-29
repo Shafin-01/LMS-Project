@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/auth";
 import RoleGuard from "@/components/RoleGuard";
+import { useToast } from "@/components/Toast";
 
 interface LessonData {
   id: number;
@@ -60,7 +61,6 @@ function LessonManageContent({
   const [content, setContent] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("");
   const [publishLoading, setPublishLoading] = useState(false);
   const [deletingLesson, setDeletingLesson] = useState(false);
 
@@ -74,14 +74,15 @@ function LessonManageContent({
   const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
 
   const router = useRouter();
+  const { showToast } = useToast();
 
   const loadQuizzes = async () => {
-    // Quiz list আলাদা filtered query (`/quizzes?filters[lesson]...`) দিয়ে না এনে,
-    // lesson-এর নিজের findOne()-এ যে quizzes populate করা আছে সেখান থেকে আনছি।
-    // কারণ: lesson unpublish (draft) অবস্থায় থাকলে relation-filter দিয়ে করা
-    // আলাদা query ফাঁকা array ফেরত দিচ্ছিল — এমনকি creator/Admin-এর জন্যও।
-    // lesson-এর populate সরাসরি ওই নির্দিষ্ট document-এর quiz টেনে আনে,
-    // lesson-এর publish status যাই হোক না কেন, তাই এটা reliable।
+    // Fetching quizzes via the lesson's own findOne() populate, rather than a
+    // separate relation-filtered query (`/quizzes?filters[lesson]...`).
+    // Reason: when the lesson is in draft (unpublished) status, the separate
+    // filtered query was returning an empty array — even for the creator/Admin.
+    // The lesson's populate reliably pulls in that specific document's quizzes
+    // regardless of the lesson's publish status.
     const res = await authFetch(`/lessons/${lessonId}`);
     setQuizzes(res.data?.quizzes || []);
   };
@@ -89,16 +90,16 @@ function LessonManageContent({
   const loadData = async () => {
     setError("");
     try {
-      // lesson.ts এর findOne() override status query param ধরে না, নিজে থেকেই
-      // সবসময় draft (সবচেয়ে latest edit) ফেরত দেয় — এটাই আমরা চাই এই edit ফর্মে।
-      // এই একই response-এ populate করা quizzes-ও চলে আসে, তাই আলাদা করে
-      // loadQuizzes() কল না করে এখান থেকেই সরাসরি set করে দিচ্ছি (extra
-      // network call বাঁচলো)।
+      // lesson.ts's findOne() override ignores the status query param and always
+      // returns the draft (most recently edited) version — which is exactly what
+      // we want in this edit form. The same response also includes the populated
+      // quizzes, so we set them directly here instead of making a separate
+      // loadQuizzes() call (saves an extra network request).
       const lessonRes = await authFetch(`/lessons/${lessonId}`);
       const lessonData = lessonRes.data;
 
       if (!lessonData) {
-        setError("Lesson পাওয়া যায়নি।");
+        setError("Lesson not found.");
         setLoading(false);
         return;
       }
@@ -119,7 +120,7 @@ function LessonManageContent({
       setVideoUrl(lessonData.VideoURL || "");
       setQuizzes(lessonData.quizzes || []);
     } catch (err: any) {
-      setError(err.message || "Lesson load করা যায়নি।");
+      setError(err.message || "Failed to load the lesson.");
     } finally {
       setLoading(false);
     }
@@ -133,7 +134,6 @@ function LessonManageContent({
   const handleSaveLesson = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setSaveMessage("");
     setError("");
 
     try {
@@ -143,10 +143,10 @@ function LessonManageContent({
           data: { Title: title, Content: content, VideoURL: videoUrl || null },
         }),
       });
-      setSaveMessage("Lesson update হয়েছে। ✅");
+      showToast("Lesson updated.");
       await loadData();
     } catch (err: any) {
-      setError(err.message || "Update করা যায়নি।");
+      showToast(err.message || "Failed to update the lesson.", "error");
     } finally {
       setSaving(false);
     }
@@ -162,9 +162,10 @@ function LessonManageContent({
       await authFetch(`/lessons/${lessonId}/actions/${action}`, {
         method: "POST",
       });
+      showToast(action === "publish" ? "Lesson published." : "Lesson unpublished.");
       await loadData();
     } catch (err: any) {
-      setError(err.message || "Publish/Unpublish করা যায়নি।");
+      showToast(err.message || "Failed to publish/unpublish the lesson.", "error");
     } finally {
       setPublishLoading(false);
     }
@@ -173,7 +174,7 @@ function LessonManageContent({
   const handleDeleteLesson = async () => {
     if (
       !window.confirm(
-        "তুমি কি নিশ্চিত এই Lesson delete করতে চাও? এর সব Quiz question-ও delete হয়ে যাবে!"
+        "Are you sure you want to delete this lesson? All of its quiz questions will be deleted too!"
       )
     )
       return;
@@ -183,7 +184,7 @@ function LessonManageContent({
       await authFetch(`/lessons/${lessonId}`, { method: "DELETE" });
       router.push(`/dashboard/courses/${courseId}`);
     } catch (err: any) {
-      setError(err.message || "Delete করা যায়নি।");
+      showToast(err.message || "Failed to delete the lesson.", "error");
       setDeletingLesson(false);
     }
   };
@@ -193,7 +194,7 @@ function LessonManageContent({
     setAddQuizError("");
 
     if (!newQuiz.CorrectAnswer) {
-      setAddQuizError("কোনটা সঠিক উত্তর সেটা বেছে নাও (A/B/C/D)।");
+      setAddQuizError("Select which option is the correct answer (A/B/C/D).");
       return;
     }
 
@@ -206,9 +207,10 @@ function LessonManageContent({
         }),
       });
       setNewQuiz(EMPTY_QUIZ_FORM);
+      showToast("Question added.");
       await loadQuizzes();
     } catch (err: any) {
-      setAddQuizError(err.message || "Quiz question যোগ করা যায়নি।");
+      setAddQuizError(err.message || "Failed to add the quiz question.");
     } finally {
       setAddingQuiz(false);
     }
@@ -233,7 +235,7 @@ function LessonManageContent({
 
   const handleSaveEditQuiz = async (quizDocId: string) => {
     if (!editQuizForm.CorrectAnswer) {
-      alert("কোনটা সঠিক উত্তর সেটা বেছে নাও (A/B/C/D)।");
+      showToast("Select which option is the correct answer (A/B/C/D).", "error");
       return;
     }
 
@@ -244,23 +246,25 @@ function LessonManageContent({
         body: JSON.stringify({ data: editQuizForm }),
       });
       setEditingQuizId(null);
+      showToast("Question updated.");
       await loadQuizzes();
     } catch (err: any) {
-      alert(err.message || "Quiz question update করা যায়নি।");
+      showToast(err.message || "Failed to update the quiz question.", "error");
     } finally {
       setSavingQuizId(null);
     }
   };
 
   const handleDeleteQuiz = async (quizDocId: string) => {
-    if (!window.confirm("এই quiz question delete করতে চাও?")) return;
+    if (!window.confirm("Delete this quiz question?")) return;
 
     setDeletingQuizId(quizDocId);
     try {
       await authFetch(`/quizzes/${quizDocId}`, { method: "DELETE" });
+      showToast("Question deleted.");
       await loadQuizzes();
     } catch (err: any) {
-      alert(err.message || "Delete করা যায়নি।");
+      showToast(err.message || "Failed to delete the quiz question.", "error");
     } finally {
       setDeletingQuizId(null);
     }
@@ -277,7 +281,7 @@ function LessonManageContent({
   if (!lesson) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-red-400">{error || "Lesson পাওয়া যায়নি।"}</p>
+        <p className="text-red-400">{error || "Lesson not found."}</p>
         <Link
           href={`/dashboard/courses/${courseId}`}
           className="text-sm text-indigo-400 hover:underline"
@@ -316,7 +320,7 @@ function LessonManageContent({
             <button
               onClick={handleTogglePublish}
               disabled={publishLoading}
-              className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg"
+              className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800 disabled:opacity-50"
             >
               {publishLoading ? "..." : lesson.isPublished ? "Unpublish" : "Publish"}
             </button>
@@ -371,16 +375,13 @@ function LessonManageContent({
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
             />
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={saving}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg"
-            >
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
-            {saveMessage && <span className="text-xs text-slate-400">{saveMessage}</span>}
-          </div>
+          <button
+            type="submit"
+            disabled={saving}
+            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg"
+          >
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
         </form>
 
         {/* Quiz management */}
@@ -389,7 +390,7 @@ function LessonManageContent({
 
           {quizzes.length === 0 ? (
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-slate-400 text-sm">
-              এখনো কোনো quiz question নেই।
+              No quiz questions yet.
             </div>
           ) : (
             <div className="space-y-3">
@@ -515,7 +516,7 @@ function LessonManageContent({
                 onChange={(e) => setNewQuiz({ ...newQuiz, Question: e.target.value })}
                 required
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
-                placeholder="প্রশ্ন লেখো..."
+                placeholder="Write the question..."
               />
             </div>
 
@@ -543,7 +544,7 @@ function LessonManageContent({
             })}
 
             <p className="text-[11px] text-slate-500">
-              রেডিও বাটন ক্লিক করে বেছে নাও কোন Option-টা সঠিক উত্তর।
+              Click the radio button to select which option is the correct answer.
             </p>
 
             <button
@@ -551,7 +552,7 @@ function LessonManageContent({
               disabled={addingQuiz}
               className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium px-5 py-2.5 rounded-lg"
             >
-              {addingQuiz ? "Adding..." : "Question যোগ করো"}
+              {addingQuiz ? "Adding..." : "Add Question"}
             </button>
           </form>
         </div>

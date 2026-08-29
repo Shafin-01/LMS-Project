@@ -4,5 +4,6 @@ export default {
     { method: 'GET', path: '/dashboard/users', handler: 'dashboard.listUsers', config: { policies: [] } },
     { method: 'GET', path: '/dashboard/roles', handler: 'dashboard.listRoles', config: { policies: [] } },
     { method: 'PUT', path: '/dashboard/users/role', handler: 'dashboard.updateUserRole', config: { policies: [] } },
+    { method: 'DELETE', path: '/dashboard/users/:userId', handler: 'dashboard.deleteUser', config: { policies: [] } },
   ],
 };

@@ -7,6 +7,7 @@ interface Course {
   documentId: string;
   Title: string;
   Description: any;
+  enrollmentCount?: number;
 }
 
 interface CoursesResponse {
@@ -21,6 +22,12 @@ function descriptionToText(description: any): string {
       .join(" ");
   }
   return "No description provided.";
+}
+
+function formatEnrollmentCount(count: number): string {
+  if (count === 0) return "No students enrolled yet";
+  if (count === 1) return "1 student enrolled";
+  return `${count.toLocaleString()} students enrolled`;
 }
 
 export default async function CoursesPage() {
@@ -52,7 +59,7 @@ export default async function CoursesPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-6 lg:gap-8">
             {courses.map((course) => (
               <div
                 key={course.id}
@@ -63,13 +70,30 @@ export default async function CoursesPage() {
                   <p className="text-slate-400 text-sm line-clamp-3">
                     {descriptionToText(course.Description)}
                   </p>
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      className="h-3.5 w-3.5"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
+                      />
+                    </svg>
+                    {formatEnrollmentCount(course.enrollmentCount || 0)}
+                  </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-800 space-y-3">
-                  <Link href={`/courses/${course.documentId || course.id}`} className="block">
-                    <span className="text-sm font-medium text-indigo-400 hover:underline">
-                      View Course →
-                    </span>
+                <div className="pt-4 border-t border-slate-800 space-y-2.5">
+                  <Link
+                    href={`/courses/${course.documentId || course.id}`}
+                    className="block w-full text-center rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800"
+                  >
+                    View Course
                   </Link>
 
                   <EnrollButton courseId={course.documentId || course.id} />

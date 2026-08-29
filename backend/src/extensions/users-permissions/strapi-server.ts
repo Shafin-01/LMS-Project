@@ -5,32 +5,33 @@ export default (plugin: any) => {
     const requester = ctx.state.user;
 
     if (!requester) {
-      return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      return ctx.unauthorized('Login is required.');
     }
 
     const isSelf = String(ctx.params.id) === String(requester.id);
     const isAdmin = requester.role?.name === 'Admin';
 
     if (!isSelf && !isAdmin) {
-      return ctx.forbidden('তুমি অন্য user-এর তথ্য পরিবর্তন করতে পারবে না।');
+      return ctx.forbidden('You cannot modify another user\'s account.');
     }
 
     if (ctx.request.body?.role !== undefined && !isAdmin) {
-      return ctx.forbidden('তোমার নিজের role পরিবর্তন করার permission নেই।');
+      return ctx.forbidden('You do not have permission to change your own role.');
     }
 
     return originalUpdate(ctx);
   };
 
-  // Strapi-র default /api/users/me endpoint "?populate=role" query param
-  // ignore করে ফেলে (ctx.state.user সরাসরি sanitize করে রিটার্ন করে, নতুন
-  // করে populate করে না) — ফলে frontend কখনো role পায় না। তাই এখানে "me"
-  // override করে সরাসরি database থেকে role সহ user নিয়ে আসছি।
+  // Strapi's default /api/users/me endpoint ignores the "?populate=role"
+  // query param (it sanitizes and returns ctx.state.user directly, without
+  // re-populating it) — so the frontend would never receive the role. The
+  // "me" action is overridden here to fetch the user, with its role, straight
+  // from the database instead.
   plugin.controllers.user.me = async (ctx: any) => {
     const requester = ctx.state.user;
 
     if (!requester) {
-      return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      return ctx.unauthorized('Login is required.');
     }
 
     const fullUser = await strapi.db.query('plugin::users-permissions.user').findOne({
@@ -39,7 +40,7 @@ export default (plugin: any) => {
     });
 
     if (!fullUser) {
-      return ctx.notFound('User পাওয়া যায়নি।');
+      return ctx.notFound('User not found.');
     }
 
     const { password, resetPasswordToken, confirmationToken, ...safeUser } = fullUser as any;

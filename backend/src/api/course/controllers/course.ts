@@ -5,16 +5,48 @@ export default factories.createCoreController(
   'api::course.course',
   ({ strapi }) => ({
 
+    // find/findOne defer to the default core behavior (which already handles
+    // published-vs-draft visibility, populate, filters, sorting, etc. via
+    // permissions) and only add an "enrollmentCount" number onto each course.
+    // A plain count is safe to expose publicly — unlike populating the
+    // enrollments relation itself, it doesn't leak any student data.
+    async find(ctx) {
+      const result = await super.find(ctx);
+      const courses = result?.data || [];
+
+      const withCounts = await Promise.all(
+        courses.map(async (course: any) => {
+          const enrollmentCount = await strapi.db
+            .query('api::enrollment.enrollment')
+            .count({ where: { course: course.id } });
+          return { ...course, enrollmentCount };
+        })
+      );
+
+      return { ...result, data: withCounts };
+    },
+
+    async findOne(ctx) {
+      const result = await super.findOne(ctx);
+      if (!result?.data) return result;
+
+      const enrollmentCount = await strapi.db
+        .query('api::enrollment.enrollment')
+        .count({ where: { course: result.data.id } });
+
+      return { ...result, data: { ...result.data, enrollmentCount } };
+    },
+
     async create(ctx) {
       const user = ctx.state.user;
-      if (!user) return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      if (!user) return ctx.unauthorized('Login is required.');
       const roleName = user.role?.name;
       if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-        return ctx.forbidden('তোমার course তৈরি করার permission নেই।');
+        return ctx.forbidden('You do not have permission to create a course.');
       }
       const requestData = ctx.request.body?.data || {};
       if (!requestData.Title || !requestData.Title.trim()) {
-        return ctx.badRequest('Course-এর Title দিতে হবে।');
+        return ctx.badRequest('Course Title is required.');
       }
       const instructorId = roleName === 'Instructor' ? user.id : requestData.instructor;
       const course = await strapi.documents('api::course.course').create({
@@ -31,13 +63,13 @@ export default factories.createCoreController(
       const user = ctx.state.user;
 
       if (!user) {
-        return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+        return ctx.unauthorized('Login is required.');
       }
 
       const roleName = user.role?.name;
 
       if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-        return ctx.forbidden('তোমার course edit করার permission নেই।');
+        return ctx.forbidden('You do not have permission to edit courses.');
       }
 
       const existingCourse = await strapi
@@ -48,11 +80,11 @@ export default factories.createCoreController(
         });
 
       if (!existingCourse) {
-        return ctx.notFound('Course পাওয়া যায়নি।');
+        return ctx.notFound('Course not found.');
       }
 
       if (roleName === 'Instructor' && existingCourse.instructor?.id !== user.id) {
-        return ctx.forbidden('তুমি শুধু নিজের course-ই edit করতে পারবে।');
+        return ctx.forbidden('You can only edit your own courses.');
       }
 
       const requestData = ctx.request.body?.data || {};
@@ -62,15 +94,15 @@ export default factories.createCoreController(
       if (requestData.Description !== undefined) updateData.Description = requestData.Description;
 
       if (requestData.instructor !== undefined) {
-        // Instructor নিজের course-এর instructor অন্য কারো নামে বদলাতে পারবে না।
+        // An instructor cannot reassign their own course to a different instructor.
         updateData.instructor = roleName === 'Instructor' ? user.id : requestData.instructor;
       }
 
-      // super.update() এর বদলে সরাসরি Document Service ব্যবহার করছি — কারণ
-      // super.update() status উল্লেখ না করলে entry-টাকে published বানিয়ে ফেলে।
-      // Lesson-এ ঠিক এই একই bug পাওয়া গিয়েছিল, একই কারণে এখানেও ফিক্স করা হলো
-      // (এতদিন ধরা পড়েনি কারণ যে course-এ Save Changes টেস্ট করা হয়েছিল সেটা
-      // আগে থেকেই published ছিল)।
+      // Using the Document Service directly instead of super.update() — because
+      // super.update() silently publishes the entry when status is not specified.
+      // The exact same bug was found in Lesson and is fixed here for the same reason
+      // (it went unnoticed for a while because the course used to test Save Changes
+      // was already published).
       const updatedCourse = await strapi.documents('api::course.course').update({
         documentId: ctx.params.id,
         data: updateData,
@@ -81,19 +113,19 @@ export default factories.createCoreController(
 
     async delete(ctx) {
       const user = ctx.state.user;
-      if (!user) return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      if (!user) return ctx.unauthorized('Login is required.');
       const roleName = user.role?.name;
       if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-        return ctx.forbidden('তোমার course delete করার permission নেই।');
+        return ctx.forbidden('You do not have permission to delete courses.');
       }
       if (roleName === 'Instructor') {
         const course = await strapi.documents('api::course.course').findOne({
           documentId: ctx.params.id,
           populate: ['instructor'],
         });
-        if (!course) return ctx.notFound('Course পাওয়া যায়নি।');
+        if (!course) return ctx.notFound('Course not found.');
         if (course.instructor?.id !== user.id) {
-          return ctx.forbidden('তুমি শুধু নিজের course-ই delete করতে পারবে।');
+          return ctx.forbidden('You can only delete your own courses.');
         }
       }
       return super.delete(ctx);
@@ -101,10 +133,10 @@ export default factories.createCoreController(
 
     async myCourses(ctx) {
       const user = ctx.state.user;
-      if (!user) return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      if (!user) return ctx.unauthorized('Login is required.');
       const roleName = user.role?.name;
       if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-        return ctx.forbidden('তোমার এই তথ্য দেখার permission নেই।');
+        return ctx.forbidden('You do not have permission to view this information.');
       }
       const isInstructor = roleName === 'Instructor';
       const filters = isInstructor ? { instructor: { id: { $eq: user.id } } } : {};
@@ -125,16 +157,16 @@ export default factories.createCoreController(
 
     async publish(ctx) {
       const user = ctx.state.user;
-      if (!user) return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      if (!user) return ctx.unauthorized('Login is required.');
       const roleName = user.role?.name;
       if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-        return ctx.forbidden('তোমার এই permission নেই।');
+        return ctx.forbidden('You do not have this permission.');
       }
       const { id } = ctx.params;
       const course = await strapi.documents('api::course.course').findOne({ documentId: id, populate: ['instructor'] });
-      if (!course) return ctx.notFound('Course পাওয়া যায়নি।');
+      if (!course) return ctx.notFound('Course not found.');
       if (roleName === 'Instructor' && course.instructor?.id !== user.id) {
-        return ctx.forbidden('তুমি শুধু নিজের course-ই publish করতে পারবে।');
+        return ctx.forbidden('You can only publish your own courses.');
       }
       await strapi.documents('api::course.course').publish({ documentId: id });
       const publishedCourse = await strapi.documents('api::course.course').findOne({ documentId: id, status: 'published' });
@@ -143,16 +175,16 @@ export default factories.createCoreController(
 
     async unpublish(ctx) {
       const user = ctx.state.user;
-      if (!user) return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+      if (!user) return ctx.unauthorized('Login is required.');
       const roleName = user.role?.name;
       if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-        return ctx.forbidden('তোমার এই permission নেই।');
+        return ctx.forbidden('You do not have this permission.');
       }
       const { id } = ctx.params;
       const course = await strapi.documents('api::course.course').findOne({ documentId: id, populate: ['instructor'] });
-      if (!course) return ctx.notFound('Course পাওয়া যায়নি।');
+      if (!course) return ctx.notFound('Course not found.');
       if (roleName === 'Instructor' && course.instructor?.id !== user.id) {
-        return ctx.forbidden('তুমি শুধু নিজের course-ই unpublish করতে পারবে।');
+        return ctx.forbidden('You can only unpublish your own courses.');
       }
       await strapi.documents('api::course.course').unpublish({ documentId: id });
       const draftCourse = await strapi.documents('api::course.course').findOne({ documentId: id, status: 'draft' });

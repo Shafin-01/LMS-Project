@@ -7,20 +7,20 @@ export default factories.createCoreController(
 
         async create(ctx) {
             return ctx.forbidden(
-                'সরাসরি enrollment তৈরি করা যাবে না। "/enrollments/enroll" endpoint ব্যবহার করো।'
+                'Enrollments cannot be created directly. Use the "/enrollments/enroll" endpoint.'
             );
         },
 
         async update(ctx) {
             return ctx.forbidden(
-                'সরাসরি enrollment update করা যাবে না। "/enrollments/:id/complete-lesson" endpoint ব্যবহার করো।'
+                'Enrollments cannot be updated directly. Use the "/enrollments/:id/complete-lesson" endpoint.'
             );
         },
 
         async delete(ctx) {
             const user = ctx.state.user;
             if (!user || user.role?.name !== 'Admin') {
-                return ctx.forbidden('শুধু Admin enrollment delete করতে পারবে।');
+                return ctx.forbidden('Only an Admin can delete enrollments.');
             }
             return super.delete(ctx);
         },
@@ -28,7 +28,7 @@ export default factories.createCoreController(
         async find(ctx) {
             const user = ctx.state.user;
             if (!user) {
-                return ctx.unauthorized('Login করা বাধ্যতামূলক।');
+                return ctx.unauthorized('Login is required.');
             }
             const roleName = user.role?.name;
 
@@ -51,27 +51,27 @@ export default factories.createCoreController(
                 return super.find(ctx);
             }
 
-            return ctx.forbidden('এই default endpoint তোমার জন্য না, "/enrollments/my-enrollments" ব্যবহার করো।');
+            return ctx.forbidden('This default endpoint is not for you — use "/enrollments/my-enrollments" instead.');
         },
 
         /**
-         * Student একটি published course-এ enroll করবে।
+         * A student enrolls in a published course.
          */
         async enroll(ctx) {
             const user = ctx.state.user;
 
             if (!user) {
-                return ctx.unauthorized('Login করা লাগবে enroll করার জন্য।');
+                return ctx.unauthorized('You must be logged in to enroll.');
             }
 
             if (user.role?.name !== 'Student') {
-                return ctx.forbidden('শুধুমাত্র Student course-এ enroll করতে পারবে।');
+                return ctx.forbidden('Only students can enroll in courses.');
             }
 
             const { courseId } = ctx.request.body || {};
 
             if (!courseId || typeof courseId !== 'string') {
-                return ctx.badRequest('Valid courseId দিতে হবে।');
+                return ctx.badRequest('A valid courseId is required.');
             }
 
             const course = await strapi
@@ -82,7 +82,7 @@ export default factories.createCoreController(
                 });
 
             if (!course) {
-                return ctx.notFound('Course পাওয়া যায়নি।');
+                return ctx.notFound('Course not found.');
             }
 
             const publishedCourse = await strapi
@@ -93,7 +93,7 @@ export default factories.createCoreController(
                 });
 
             if (!publishedCourse) {
-                return ctx.badRequest('এই course এখনো published হয়নি।');
+                return ctx.badRequest('This course has not been published yet.');
             }
 
             const existingEnrollments = await strapi
@@ -106,7 +106,7 @@ export default factories.createCoreController(
                 });
 
             if (existingEnrollments.length > 0) {
-                return ctx.badRequest('তুমি আগে থেকেই এই course-এ enroll করা আছো।');
+                return ctx.badRequest('You are already enrolled in this course.');
             }
 
             const enrollment = await strapi
@@ -120,7 +120,7 @@ export default factories.createCoreController(
                 });
 
             if (!enrollment?.documentId) {
-                return ctx.internalServerError('Enrollment তৈরি করা যায়নি।');
+                return ctx.internalServerError('Failed to create enrollment.');
             }
 
             const createdEnrollment = await strapi
@@ -135,7 +135,7 @@ export default factories.createCoreController(
                 });
 
             if (!createdEnrollment || !createdEnrollment.course?.documentId) {
-                return ctx.internalServerError('Enrollment তৈরি হয়েছে কিন্তু course relation পাওয়া যায়নি।');
+                return ctx.internalServerError('Enrollment was created but the course relation could not be found.');
             }
 
             return {
@@ -147,17 +147,17 @@ export default factories.createCoreController(
         },
 
         /**
-         * Current student-এর সব enrollment।
+         * All enrollments for the current student.
          */
         async myEnrollments(ctx) {
             const user = ctx.state.user;
 
             if (!user) {
-                return ctx.unauthorized('Login করা লাগবে।');
+                return ctx.unauthorized('You must be logged in.');
             }
 
             if (user.role?.name !== 'Student') {
-                return ctx.forbidden('শুধুমাত্র Student নিজের enrollments দেখতে পারবে।');
+                return ctx.forbidden('Only students can view their own enrollments.');
             }
 
             const enrollments = await strapi
@@ -180,23 +180,23 @@ export default factories.createCoreController(
         },
 
         /**
-         * Current student নির্দিষ্ট একটি course-এ enrolled কিনা।
+         * Whether the current student is enrolled in a specific course.
          */
         async myEnrollmentForCourse(ctx) {
             const user = ctx.state.user;
 
             if (!user) {
-                return ctx.unauthorized('Login করা লাগবে।');
+                return ctx.unauthorized('You must be logged in.');
             }
 
             if (user.role?.name !== 'Student') {
-                return ctx.forbidden('শুধুমাত্র Student নিজের enrollment দেখতে পারবে।');
+                return ctx.forbidden('Only students can view their own enrollment.');
             }
 
             const { courseId } = ctx.params;
 
             if (!courseId || typeof courseId !== 'string') {
-                return ctx.badRequest('Valid courseId দিতে হবে।');
+                return ctx.badRequest('A valid courseId is required.');
             }
 
             const course = await strapi
@@ -204,7 +204,7 @@ export default factories.createCoreController(
                 .findOne({ documentId: courseId });
 
             if (!course) {
-                return ctx.notFound('Course পাওয়া যায়নি।');
+                return ctx.notFound('Course not found.');
             }
 
             const enrollments = await strapi
@@ -231,24 +231,24 @@ export default factories.createCoreController(
         },
 
         /**
-         * Student একটি lesson complete হিসেবে mark করবে।
+         * A student marks a lesson as complete.
          */
         async completeLesson(ctx) {
             const user = ctx.state.user;
 
             if (!user) {
-                return ctx.unauthorized('Login করা লাগবে।');
+                return ctx.unauthorized('You must be logged in.');
             }
 
             if (user.role?.name !== 'Student') {
-                return ctx.forbidden('শুধুমাত্র Student lesson complete করতে পারবে।');
+                return ctx.forbidden('Only students can mark lessons as complete.');
             }
 
             const { id } = ctx.params;
             const { lessonId } = ctx.request.body || {};
 
             if (!id || !lessonId) {
-                return ctx.badRequest('enrollmentId এবং lessonId দুটোই দিতে হবে।');
+                return ctx.badRequest('Both enrollmentId and lessonId are required.');
             }
 
             const enrollment = await strapi
@@ -263,15 +263,15 @@ export default factories.createCoreController(
                 });
 
             if (!enrollment) {
-                return ctx.notFound('Enrollment পাওয়া যায়নি।');
+                return ctx.notFound('Enrollment not found.');
             }
 
             if (enrollment.student?.id !== user.id) {
-                return ctx.forbidden('এটা তোমার enrollment না।');
+                return ctx.forbidden('This is not your enrollment.');
             }
 
             if (!enrollment.course?.documentId) {
-                return ctx.badRequest('Enrollment-এর সাথে valid course পাওয়া যায়নি।');
+                return ctx.badRequest('No valid course found for this enrollment.');
             }
 
             const lesson = await strapi
@@ -282,14 +282,14 @@ export default factories.createCoreController(
                 });
 
             if (!lesson) {
-                return ctx.notFound('Lesson পাওয়া যায়নি।');
+                return ctx.notFound('Lesson not found.');
             }
 
             if (
                 !lesson.course?.documentId ||
                 lesson.course.documentId !== enrollment.course.documentId
             ) {
-                return ctx.forbidden('এই lesson তোমার enrolled course-এর অংশ নয়।');
+                return ctx.forbidden('This lesson is not part of your enrolled course.');
             }
 
             const alreadyCompleted =
@@ -344,27 +344,27 @@ export default factories.createCoreController(
                 totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
             return {
-                message: 'Lesson complete মার্ক করা হয়েছে.',
+                message: 'Lesson marked as complete.',
                 progress: { totalLessons, completedCount, percentage },
             };
         },
 
         /**
-         * একটি নির্দিষ্ট enrollment-এর progress।
-         * Student শুধু নিজেরটা, Admin/Content Manager যেকোনোটা,
-         * Instructor শুধু নিজের course-এরটা দেখতে পারবে।
+         * Progress for a specific enrollment.
+         * A student can view only their own, Admin/Content Manager can view any,
+         * an Instructor can view only their own course's.
          */
         async getProgress(ctx) {
             const user = ctx.state.user;
 
             if (!user) {
-                return ctx.unauthorized('Login করা লাগবে।');
+                return ctx.unauthorized('You must be logged in.');
             }
 
             const { id } = ctx.params;
 
             if (!id) {
-                return ctx.badRequest('enrollmentId দিতে হবে।');
+                return ctx.badRequest('enrollmentId is required.');
             }
 
             const enrollment = await strapi
@@ -381,27 +381,27 @@ export default factories.createCoreController(
                 });
 
             if (!enrollment) {
-                return ctx.notFound('Enrollment পাওয়া যায়নি।');
+                return ctx.notFound('Enrollment not found.');
             }
 
             const roleName = user.role?.name;
 
             if (roleName === 'Student') {
                 if (enrollment.student?.id !== user.id) {
-                    return ctx.forbidden('এটা তোমার enrollment না।');
+                    return ctx.forbidden('This is not your enrollment.');
                 }
             } else if (roleName === 'Admin' || roleName === 'Content Manager') {
-                // platform-এর যেকোনো progress দেখতে পারবে
+                // Can view any progress on the platform
             } else if (roleName === 'Instructor') {
                 if (enrollment.course?.instructor?.id !== user.id) {
-                    return ctx.forbidden('এটা তোমার course-এর student না।');
+                    return ctx.forbidden('This is not a student in your course.');
                 }
             } else {
-                return ctx.forbidden('তোমার এই তথ্য দেখার permission নেই।');
+                return ctx.forbidden('You do not have permission to view this information.');
             }
 
             if (!enrollment.course?.documentId) {
-                return ctx.badRequest('Enrollment-এর সাথে valid course পাওয়া যায়নি।');
+                return ctx.badRequest('No valid course found for this enrollment.');
             }
 
             const totalLessons = enrollment.course.lessons?.length || 0;
@@ -422,6 +422,20 @@ export default factories.createCoreController(
             const percentage =
                 totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
+            // The frontend's MarkCompleteButton needs to know exactly which
+            // lessons are completed (not just a count) so it can correctly
+            // show "Completed" for a specific lesson after a page refresh.
+            const completedLessonsList = (enrollment.completedLessons || [])
+                .filter(
+                    (completedLesson: any) =>
+                        completedLesson.documentId &&
+                        courseLessonDocumentIds.has(completedLesson.documentId)
+                )
+                .map((completedLesson: any) => ({
+                    id: completedLesson.id,
+                    documentId: completedLesson.documentId,
+                }));
+
             return {
                 student: {
                     id: enrollment.student?.id,
@@ -430,29 +444,30 @@ export default factories.createCoreController(
                 totalLessons,
                 completedCount,
                 percentage,
+                completedLessons: completedLessonsList,
             };
         },
 
         /**
-         * একটি course-এর সব student-এর progress list।
+         * The progress list for every student in a course.
          */
         async courseProgress(ctx) {
             const user = ctx.state.user;
 
             if (!user) {
-                return ctx.unauthorized('Login করা লাগবে।');
+                return ctx.unauthorized('You must be logged in.');
             }
 
             const roleName = user.role?.name;
 
             if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
-                return ctx.forbidden('তোমার এই তথ্য দেখার permission নেই।');
+                return ctx.forbidden('You do not have permission to view this information.');
             }
 
             const { courseId } = ctx.params;
 
             if (!courseId) {
-                return ctx.badRequest('courseId দিতে হবে।');
+                return ctx.badRequest('courseId is required.');
             }
 
             const course = await strapi
@@ -463,11 +478,11 @@ export default factories.createCoreController(
                 });
 
             if (!course) {
-                return ctx.notFound('Course পাওয়া যায়নি।');
+                return ctx.notFound('Course not found.');
             }
 
             if (roleName === 'Instructor' && course.instructor?.id !== user.id) {
-                return ctx.forbidden('এটা তোমার course না।');
+                return ctx.forbidden('This is not your course.');
             }
 
             const enrollments = await strapi
