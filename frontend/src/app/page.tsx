@@ -26,30 +26,6 @@ export default async function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto space-y-12">
-        {/* === Navbar Section === */}
-        <div className="flex justify-between items-center bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl shadow-md">
-          <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full"></span>
-            <span className="text-lg font-bold text-white tracking-wide">
-              LMS Portal
-            </span>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Link
-              href="/login"
-              className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
-            >
-              Login
-            </Link>
-            <Link
-              href="/register"
-              className="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors shadow-sm"
-            >
-              Sign Up
-            </Link>
-          </div>
-        </div>
-
         <div className="flex flex-col items-center space-y-4 max-w-2xl mx-auto text-center">
           <span className="px-3 py-1 text-xs font-semibold tracking-wider text-indigo-600 uppercase bg-indigo-100 dark:bg-indigo-950 dark:text-indigo-400 rounded-full">
             Learning Management System
