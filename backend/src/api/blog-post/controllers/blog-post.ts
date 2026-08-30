@@ -1,5 +1,5 @@
 import { factories } from '@strapi/strapi';
-import { sanitizeUser } from '../../../utils/sanitize-user';
+import { sanitizePublicAuthor } from '../../../utils/sanitize-user';
 
 export default factories.createCoreController(
   'api::blog-post.blog-post',
@@ -13,7 +13,11 @@ export default factories.createCoreController(
     // that permission (granting it would expose the full user list via
     // /api/users). So we populate the author manually through the Document
     // Service, which isn't subject to that same relation-stripping, and
-    // sanitize it ourselves with sanitizeUser() so nothing sensitive leaks.
+    // sanitize it ourselves so nothing sensitive leaks. This route has no
+    // login requirement at all, so sanitizePublicAuthor() is used here
+    // rather than the looser sanitizeUser() — see that function's comment
+    // for why (it was leaking the author's real email address to the
+    // public internet).
     async find(ctx) {
       const user = ctx.state.user;
       const roleName = user?.role?.name;
@@ -37,7 +41,7 @@ export default factories.createCoreController(
 
       const sanitizedPosts = posts.map((post: any) => ({
         ...post,
-        author: sanitizeUser(post.author),
+        author: sanitizePublicAuthor(post.author),
       }));
 
       return { data: sanitizedPosts };
@@ -60,7 +64,7 @@ export default factories.createCoreController(
 
       if (!post) return ctx.notFound('Blog post not found.');
 
-      return { data: { ...post, author: sanitizeUser(post.author) } };
+      return { data: { ...post, author: sanitizePublicAuthor(post.author) } };
     },
 
     async create(ctx) {
