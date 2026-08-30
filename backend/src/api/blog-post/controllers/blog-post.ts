@@ -112,6 +112,14 @@ export default factories.createCoreController(
       });
       if (!existingPost) return ctx.notFound('Blog post not found.');
 
+      // Whether this post is currently live BEFORE the edit — decides
+      // whether the edit below should also go live (see course.ts's
+      // update() for the full reasoning; same fix, same pattern).
+      const publishedBeforeEdit = await strapi.documents('api::blog-post.blog-post').findOne({
+        documentId: ctx.params.id,
+        status: 'published',
+      });
+
       const requestData = ctx.request.body?.data || {};
       const updateData: any = {};
       if (requestData.Title !== undefined) updateData.Title = requestData.Title;
@@ -123,6 +131,13 @@ export default factories.createCoreController(
         documentId: ctx.params.id,
         data: updateData,
       });
+
+      // A post that was already published needs its live version kept in
+      // sync with the edit — otherwise a reader keeps seeing the old text
+      // even though the dashboard shows it as "Published".
+      if (publishedBeforeEdit) {
+        await strapi.documents('api::blog-post.blog-post').publish({ documentId: ctx.params.id });
+      }
 
       return { data: updatedPost };
     },

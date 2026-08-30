@@ -269,6 +269,14 @@ export default factories.createCoreController(
         return ctx.forbidden('You can only edit lessons in your own courses.');
       }
 
+      // Whether this lesson is currently live BEFORE the edit — decides
+      // whether the edit below should also go live (see course.ts's update()
+      // for the full reasoning; same fix, same pattern).
+      const publishedBeforeEdit = await strapi.documents('api::lesson.lesson').findOne({
+        documentId: ctx.params.id,
+        status: 'published',
+      });
+
       const requestData = ctx.request.body?.data || {};
       const updateData: any = {};
 
@@ -280,6 +288,13 @@ export default factories.createCoreController(
         documentId: ctx.params.id,
         data: updateData,
       });
+
+      // A lesson that was already published needs its live version kept in
+      // sync with the edit — otherwise a Student keeps seeing the old
+      // Content/VideoURL even though the dashboard shows "Published".
+      if (publishedBeforeEdit) {
+        await strapi.documents('api::lesson.lesson').publish({ documentId: ctx.params.id });
+      }
 
       return { data: updatedLesson };
     },

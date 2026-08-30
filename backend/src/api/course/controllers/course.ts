@@ -193,15 +193,34 @@ export default factories.createCoreController(
         updateData.instructor = roleName === 'Instructor' ? user.id : requestData.instructor;
       }
 
+      // Whether this course is currently live BEFORE the edit — decides
+      // whether the edit below should also go live.
+      const publishedBeforeEdit = await strapi.documents('api::course.course').findOne({
+        documentId: ctx.params.id,
+        status: 'published',
+      });
+
       // Using the Document Service directly instead of super.update() — because
       // super.update() silently publishes the entry when status is not specified.
       // The exact same bug was found in Lesson and is fixed here for the same reason
       // (it went unnoticed for a while because the course used to test Save Changes
-      // was already published).
+      // was already published). This still only ever touches the draft row, so a
+      // course that was never published stays a draft after an edit, exactly as
+      // before.
       const updatedCourse = await strapi.documents('api::course.course').update({
         documentId: ctx.params.id,
         data: updateData,
       });
+
+      // ...but a course that WAS already live needs its published version kept
+      // in sync too — otherwise Save Changes silently edits only the invisible
+      // draft copy while students keep seeing the old, unedited content, even
+      // though the dashboard still shows it as "Published". Re-publishing here
+      // pushes the new edit into the live version immediately, the same way
+      // quiz.ts already does after every update.
+      if (publishedBeforeEdit) {
+        await strapi.documents('api::course.course').publish({ documentId: ctx.params.id });
+      }
 
       return { data: updatedCourse };
     },
