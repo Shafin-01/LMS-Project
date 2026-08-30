@@ -24,6 +24,21 @@ interface CourseData {
   isPublished: boolean;
 }
 
+// One row of the "/enrollments/course/:courseId/progress" response — the
+// backend already restricts this endpoint per the permission matrix
+// (Admin/Content Manager see any course, an Instructor only their own), so
+// this page doesn't need its own extra role check for it.
+interface StudentProgressItem {
+  student: {
+    id: number;
+    username: string;
+    email: string;
+  };
+  totalLessons: number;
+  completedCount: number;
+  percentage: number;
+}
+
 function CourseManageContent({ courseId }: { courseId: string }) {
   const [course, setCourse] = useState<CourseData | null>(null);
   const [lessons, setLessons] = useState<LessonItem[]>([]);
@@ -36,8 +51,27 @@ function CourseManageContent({ courseId }: { courseId: string }) {
   const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
   const [togglingLessonId, setTogglingLessonId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [studentProgress, setStudentProgress] = useState<StudentProgressItem[]>([]);
+  const [progressLoading, setProgressLoading] = useState(true);
   const router = useRouter();
   const { showToast } = useToast();
+
+  // Kept separate from loadData() on purpose: this list is a "nice to have"
+  // next to the course/lesson editor above, not something the whole page
+  // should fail to render over. If it errors out (e.g. no students enrolled
+  // yet, or a transient network issue) we just show an empty state instead
+  // of blocking the rest of the page.
+  const loadStudentProgress = async () => {
+    setProgressLoading(true);
+    try {
+      const progressRes = await authFetch(`/enrollments/course/${courseId}/progress`);
+      setStudentProgress(progressRes.data || []);
+    } catch {
+      setStudentProgress([]);
+    } finally {
+      setProgressLoading(false);
+    }
+  };
 
   const loadData = async () => {
     setError("");
@@ -99,6 +133,7 @@ function CourseManageContent({ courseId }: { courseId: string }) {
 
   useEffect(() => {
     loadData();
+    loadStudentProgress();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId]);
 
@@ -351,6 +386,49 @@ function CourseManageContent({ courseId }: { courseId: string }) {
                     >
                       {deletingLessonId === lesson.documentId ? "..." : "Delete"}
                     </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <h2 className="text-xl font-bold text-white">Student Progress</h2>
+
+          {progressLoading ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-slate-400 text-sm">
+              Loading student progress...
+            </div>
+          ) : studentProgress.length === 0 ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-slate-400 text-sm">
+              No students have enrolled in this course yet.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {studentProgress.map((entry) => (
+                <div
+                  key={entry.student.id}
+                  className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl p-4"
+                >
+                  <div className="min-w-[140px]">
+                    <p className="text-white font-medium">{entry.student.username}</p>
+                    <p className="text-xs text-slate-500">{entry.student.email}</p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-32 h-2 rounded-full bg-slate-800 overflow-hidden">
+                      <div
+                        className="h-full bg-indigo-500 rounded-full transition-all"
+                        style={{ width: `${entry.percentage}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-semibold text-slate-200 w-11 text-right">
+                      {entry.percentage}%
+                    </span>
+                    <span className="text-xs text-slate-500 whitespace-nowrap">
+                      {entry.completedCount}/{entry.totalLessons} lessons
+                    </span>
                   </div>
                 </div>
               ))}
