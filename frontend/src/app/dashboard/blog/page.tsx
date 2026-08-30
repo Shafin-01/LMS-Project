@@ -1,6 +1,15 @@
 "use client";
 
+import { fetchAPI } from "@/lib/api";
 import Link from "next/link";
+
+// This page always fetches live data from Strapi (cache: "no-store"),
+// so it can never be statically prerendered at build time. Declaring it
+// dynamic explicitly stops Next.js from attempting static generation for
+// it (which fails the build) and just renders it fresh on every request.
+export const dynamic = "force-dynamic";
+
+
 import RoleGuard from "@/components/RoleGuard";
 import BackButton from "@/components/BackButton";
 import BlogPostManageList from "@/components/BlogPostManageList";

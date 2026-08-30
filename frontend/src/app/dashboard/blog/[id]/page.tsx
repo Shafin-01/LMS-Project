@@ -1,12 +1,16 @@
 "use client";
 
+import { fetchAPI } from "@/lib/api";
+import BackButton from "@/components/BackButton";
+
+export const dynamic = "force-dynamic";
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/auth";
 import { toBlocks, blocksToText } from "@/lib/api";
 import RoleGuard from "@/components/RoleGuard";
 import { useToast } from "@/components/Toast";
-import BackButton from "@/components/BackButton";
+
 
 function EditBlogPostForm({ postId }: { postId: string }) {
   const [title, setTitle] = useState("");

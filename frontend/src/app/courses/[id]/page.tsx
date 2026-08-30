@@ -3,6 +3,9 @@ import BackButton from "@/components/BackButton";
 import LessonList from "@/components/LessonList";
 import CourseProgress from "@/components/CourseProgress";
 
+export const dynamic = "force-dynamic";
+
+
 interface Lesson {
   id: number;
   documentId?: string;

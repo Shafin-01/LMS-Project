@@ -2,6 +2,9 @@ import { fetchAPI } from "@/lib/api";
 import Link from "next/link";
 import EnrollButton from "@/components/EnrollButton";
 
+export const dynamic = "force-dynamic";
+
+
 interface Course {
   id: number;
   documentId: string;
