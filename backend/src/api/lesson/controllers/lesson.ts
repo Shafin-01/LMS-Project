@@ -68,12 +68,22 @@ export default factories.createCoreController(
       // Content Manager (any lesson) or the Instructor who owns the
       // lesson's course (previewing their own draft) may see the draft
       // version; everyone else only ever gets the published one.
+      //
+      // "instructor" is populated one level under course on BOTH branches
+      // below, purely for the ownership check further down — it is deleted
+      // back off before the lesson is used any further, so it never reaches
+      // the response. The populate shape is written out on each call
+      // (rather than shared through one variable) because Strapi's
+      // generated types infer a precise literal-array type for populate
+      // only when the object is written directly at the call site;
+      // hoisting it into a shared variable loses that inference and fails
+      // to compile.
       let lesson: any = await strapi
         .documents('api::lesson.lesson')
         .findOne({
           documentId: lessonId,
           status: 'published',
-          populate: ['course', 'quizzes'],
+          populate: { course: { populate: ['instructor'] }, quizzes: true },
         });
 
       if (!lesson) {
@@ -82,10 +92,6 @@ export default factories.createCoreController(
           .findOne({
             documentId: lessonId,
             status: 'draft',
-            // "instructor" is populated one level deeper here (unlike the
-            // published branch above) purely to check ownership below — it
-            // is deleted back off before the lesson is used any further, so
-            // it never reaches the response.
             populate: { course: { populate: ['instructor'] }, quizzes: true },
           });
 
@@ -94,7 +100,6 @@ export default factories.createCoreController(
           draftLesson?.course?.instructor?.id === user.id;
 
         if (draftLesson && (canViewAnyDraft || isOwningInstructor)) {
-          if (draftLesson.course) delete draftLesson.course.instructor;
           lesson = draftLesson;
         }
       }
@@ -104,6 +109,20 @@ export default factories.createCoreController(
           'Lesson not found.'
         );
       }
+
+      // Every other action in this file (update/delete/publish/unpublish)
+      // restricts an Instructor to only their own courses' lessons — this
+      // was previously only enforced for the draft-preview branch above,
+      // leaving a gap where an Instructor could fetch ANY other
+      // instructor's already-published lesson (full Content/VideoURL, plus
+      // its quizzes) with no ownership check at all. Closing that here.
+      if (roleName === 'Instructor' && lesson.course?.instructor?.id !== user.id) {
+        return ctx.forbidden(
+          'You can only view lessons in your own courses.'
+        );
+      }
+
+      if (lesson.course) delete lesson.course.instructor;
 
       if (roleName === 'Student') {
         const courseDocumentId = lesson.course?.documentId;
@@ -254,24 +273,45 @@ export default factories.createCoreController(
         return ctx.forbidden('You do not have permission to delete lessons.');
       }
 
-      if (roleName === 'Instructor') {
-        const lesson = await strapi
-          .documents('api::lesson.lesson')
-          .findOne({
-            documentId: ctx.params.id,
-            populate: { course: { populate: ['instructor'] } },
-          });
+      const lesson: any = await strapi
+        .documents('api::lesson.lesson')
+        .findOne({
+          documentId: ctx.params.id,
+          populate: { course: { populate: ['instructor'] } },
+        });
 
-        if (!lesson) {
-          return ctx.notFound('Lesson not found.');
-        }
-
-        if (lesson.course?.instructor?.id !== user.id) {
-          return ctx.forbidden('You can only delete lessons in your own courses.');
-        }
+      if (!lesson) {
+        return ctx.notFound('Lesson not found.');
       }
 
-      return super.delete(ctx);
+      if (
+        roleName === 'Instructor' &&
+        lesson.course?.instructor?.id !== user.id
+      ) {
+        return ctx.forbidden('You can only delete lessons in your own courses.');
+      }
+
+      // super.delete() only removes theals, and documentId is
+      // the one identifier that's stable across both.
+      const quizzes = await strapi.documents('api::quiz.quiz').findMany({
+        filters: { lesson: { documentId: { $eq: lesson.documentId } } },
+        fields: ['id'],
+      });
+      for (const quiz of quizzes as any[]) {
+        await strapi.documents('api::quiz.quiz').delete({ documentId: quiz.documentId });
+      }
+
+      const quizResults = await strapi.documents('api::quiz-result.quiz-result').findMany({
+        filters: { lesson: { documentId: { $eq: lesson.documentId } } },
+        fields: ['id'],
+      });
+      for (const result of quizResults as any[]) {
+        await strapi.documents('api::quiz-result.quiz-result').delete({ documentId: result.documentId });
+      }
+
+      await strapi.documents('api::lesson.lesson').delete({ documentId: lesson.documentId });
+
+      return { data: { id: lesson.id } };
     },
 
     async publish(ctx) {
@@ -401,12 +441,17 @@ export default factories.createCoreController(
 
       // A quiz can only be attempted once — this check lives on the backend
       // (not just the frontend) so a direct API call can't bypass it either.
+      // Filtered/linked by the lesson's documentId rather than its numeric
+      // id — same reasoning as lesson.ts's delete() cascade above:
+      // documentId is the one identifier that's stable regardless of which
+      // row (draft or published) a "lesson" relation actually resolves
+      // against internally.
       const existingResults = await strapi
         .documents('api::quiz-result.quiz-result')
         .findMany({
           filters: {
             student: { id: { $eq: user.id } },
-            lesson: { id: { $eq: lesson.id } },
+            lesson: { documentId: { $eq: lesson.documentId } },
           },
         });
 
@@ -417,7 +462,7 @@ export default factories.createCoreController(
       const quizzes = await strapi
         .documents('api::quiz.quiz')
         .findMany({
-          filters: { lesson: { id: lesson.id } },
+          filters: { lesson: { documentId: { $eq: lesson.documentId } } },
         });
 
       if (!quizzes || quizzes.length === 0) {
@@ -439,7 +484,7 @@ export default factories.createCoreController(
         .create({
           data: {
             student: user.id,
-            lesson: lesson.id,
+            lesson: lesson.documentId,
             score,
             totalQuestions: quizzes.length,
             answers,
@@ -480,12 +525,14 @@ export default factories.createCoreController(
         return ctx.notFound('Lesson not found.');
       }
 
+      // Filtered by the lesson's documentId rather than its numeric id — same
+      // reasoning as submitQuiz() above.
       const results = await strapi
         .documents('api::quiz-result.quiz-result')
         .findMany({
           filters: {
             student: { id: { $eq: user.id } },
-            lesson: { id: { $eq: lesson.id } },
+            lesson: { documentId: { $eq: lesson.documentId } },
           },
         });
 
@@ -498,7 +545,7 @@ export default factories.createCoreController(
       const quizzes = await strapi
         .documents('api::quiz.quiz')
         .findMany({
-          filters: { lesson: { id: lesson.id } },
+          filters: { lesson: { documentId: { $eq: lesson.documentId } } },
         });
 
       const review = quizzes.map((quiz: any) => ({

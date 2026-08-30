@@ -77,8 +77,20 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }) => 
       return ctx.forbidden('You do not have permission to create a quiz.');
     }
 
+    const lessonDocId = ctx.request.body?.data?.lesson;
+
+    // Only the Instructor branch used to check this, so an Admin/Content
+    // Manager request missing "lesson" (never sent by the shipped UI, but
+    // reachable via a direct API call) fell straight through to
+    // super.create() and silently created an orphan quiz attached to no
+    // lesson — it would never show up anywhere, but would sit in the
+    // database and inflate quiz counts. Requiring it up front closes that
+    // for every role, not just Instructor.
+    if (!lessonDocId) {
+      return ctx.badRequest('A lesson must be provided for the quiz.');
+    }
+
     if (roleName === 'Instructor') {
-      const lessonDocId = ctx.request.body?.data?.lesson;
       const lesson = await strapi.documents('api::lesson.lesson').findOne({
         documentId: lessonDocId,
         populate: { course: { populate: ['instructor'] } },

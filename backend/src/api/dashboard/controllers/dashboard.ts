@@ -29,10 +29,28 @@ export default {
     const requester = await requireAdmin(ctx);
     if (!requester) return;
 
-    const totalCourses = await strapi.db.query('api::course.course').count();
-    const totalLessons = await strapi.db.query('api::lesson.lesson').count();
+    // Course/Lesson/Blog-post all have Draft & Publish enabled, which stores
+    // a draft row AND a published row for the same document once it has
+    // ever been published — two rows sharing one documentId. strapi.db.query
+    // is the raw table layer, so a plain .count() with no status filtering
+    // counts BOTH rows, silently doubling these three numbers for anything
+    // that's live (e.g. 2 real courses would show as "4"). Enrollment has
+    // Draft & Publish OFF, so it only ever has one row per enrollment and
+    // its raw count is already correct as-is.
+    // Every document always has exactly one draft row (drafting is the
+    // working copy that exists whether or not it's also published), so
+    // asking the Document Service for the draft rows gives the true,
+    // de-duplicated count of distinct courses/lessons/posts.
+    const totalCourses = (
+      await strapi.documents('api::course.course').findMany({ status: 'draft', fields: ['id'] })
+    ).length;
+    const totalLessons = (
+      await strapi.documents('api::lesson.lesson').findMany({ status: 'draft', fields: ['id'] })
+    ).length;
     const totalEnrollments = await strapi.db.query('api::enrollment.enrollment').count();
-    const totalBlogPosts = await strapi.db.query('api::blog-post.blog-post').count();
+    const totalBlogPosts = (
+      await strapi.documents('api::blog-post.blog-post').findMany({ status: 'draft', fields: ['id'] })
+    ).length;
 
     const allRoles = await strapi.db.query('plugin::users-permissions.role').findMany();
     const usersPerRole: Record<string, number> = {};

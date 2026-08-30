@@ -191,17 +191,66 @@ export default factories.createCoreController(
       if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
         return ctx.forbidden('You do not have permission to delete courses.');
       }
-      if (roleName === 'Instructor') {
-        const course = await strapi.documents('api::course.course').findOne({
-          documentId: ctx.params.id,
-          populate: ['instructor'],
-        });
-        if (!course) return ctx.notFound('Course not found.');
-        if (course.instructor?.id !== user.id) {
-          return ctx.forbidden('You can only delete your own courses.');
-        }
+
+      const course = await strapi.documents('api::course.course').findOne({
+        documentId: ctx.params.id,
+        populate: ['instructor'],
+      });
+      if (!course) return ctx.notFound('Course not found.');
+      if (roleName === 'Instructor' && course.instructor?.id !== user.id) {
+        return ctx.forbidden('You can only delete your own courses.');
       }
-      return super.delete(ctx);
+
+      // The dashboard's delete confirmation tells the user "All of its
+      // lessons and quizzes will also be deleted" — but super.delete() only
+      // removes the Course row itself. Strapi doesn't cascade-delete related
+      // content on its own, so without doing it explicitly here, every
+      // lesson (and its quizzes and quiz-results) and every enrollment for
+      // this course would be left behind as orphaned rows pointing at a
+      // course that no longer exists, making that message false.
+      const lessons = await strapi.documents('api::lesson.lesson').findMany({
+        status: 'draft',
+        filters: { course: { documentId: { $eq: course.documentId } } },
+        fields: ['id'],
+      });
+
+      for (const lesson of lessons as any[]) {
+        // Filtered by the lesson's documentId rather than its numeric id —
+        // a relation connected via documentId can resolve against either
+        // the draft or published row depending on Strapi's internals, and
+        // documentId is the one identifier that's stable across both, so
+        // this matches a quiz/quiz-result regardless of which row its
+        // "lesson" relation actually points at.
+        const quizzes = await strapi.documents('api::quiz.quiz').findMany({
+          filters: { lesson: { documentId: { $eq: lesson.documentId } } },
+          fields: ['id'],
+        });
+        for (const quiz of quizzes as any[]) {
+          await strapi.documents('api::quiz.quiz').delete({ documentId: quiz.documentId });
+        }
+
+        const quizResults = await strapi.documents('api::quiz-result.quiz-result').findMany({
+          filters: { lesson: { documentId: { $eq: lesson.documentId } } },
+          fields: ['id'],
+        });
+        for (const result of quizResults as any[]) {
+          await strapi.documents('api::quiz-result.quiz-result').delete({ documentId: result.documentId });
+        }
+
+        await strapi.documents('api::lesson.lesson').delete({ documentId: lesson.documentId });
+      }
+
+      const enrollments = await strapi.documents('api::enrollment.enrollment').findMany({
+        filters: { course: { documentId: { $eq: course.documentId } } },
+        fields: ['id'],
+      });
+      for (const enrollment of enrollments as any[]) {
+        await strapi.documents('api::enrollment.enrollment').delete({ documentId: enrollment.documentId });
+      }
+
+      await strapi.documents('api::course.course').delete({ documentId: course.documentId });
+
+      return { data: { id: course.id } };
     },
 
     async myCourses(ctx) {

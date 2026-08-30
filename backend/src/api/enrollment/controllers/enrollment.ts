@@ -30,6 +30,34 @@ export default factories.createCoreController(
             }));
         };
 
+        // The same draft-defaulting problem getPublishedLessons() exists for
+        // applies to the course object itself, not just its lessons — every
+        // "course" populated below through an enrollment comes back as
+        // whatever an Instructor has mid-edited (Title/Description included),
+        // not the published version a Student actually sees on the public
+        // course page. Without this, a Title edited-but-not-republished would
+        // show correctly on /courses/:id (which explicitly asks for
+        // status:'published') but show the stale/unpublished edit on My
+        // Courses and the homepage's "Continue Learning" — two different
+        // titles for the same course, open in the same session.
+        const withPublishedCourseData = async (course: any) => {
+            if (!course) return course;
+            const [publishedInfo, lessons] = await Promise.all([
+                strapi.documents('api::course.course').findOne({
+                    documentId: course.documentId,
+                    status: 'published',
+                    fields: ['Title', 'Description'],
+                }),
+                getPublishedLessons(course.documentId),
+            ]);
+            return {
+                ...course,
+                Title: (publishedInfo as any)?.Title ?? course.Title,
+                Description: (publishedInfo as any)?.Description ?? course.Description,
+                lessons,
+            };
+        };
+
         return {
 
         async create(ctx) {
@@ -169,10 +197,7 @@ export default factories.createCoreController(
                 data: {
                     ...createdEnrollment,
                     student: sanitizeUser(createdEnrollment.student),
-                    course: {
-                        ...createdEnrollment.course,
-                        lessons: await getPublishedLessons(createdEnrollment.course.documentId),
-                    },
+                    course: await withPublishedCourseData(createdEnrollment.course),
                 },
             };
         },
@@ -206,12 +231,7 @@ export default factories.createCoreController(
                 enrollments.map(async (enrollment: any) => ({
                     ...enrollment,
                     student: sanitizeUser(enrollment.student),
-                    course: enrollment.course
-                        ? {
-                              ...enrollment.course,
-                              lessons: await getPublishedLessons(enrollment.course.documentId),
-                          }
-                        : enrollment.course,
+                    course: await withPublishedCourseData(enrollment.course),
                 }))
             );
 
@@ -267,12 +287,7 @@ export default factories.createCoreController(
                     ? {
                           ...enrollment,
                           student: sanitizeUser(enrollment.student),
-                          course: enrollment.course
-                              ? {
-                                    ...enrollment.course,
-                                    lessons: await getPublishedLessons(enrollment.course.documentId),
-                                }
-                              : enrollment.course,
+                          course: await withPublishedCourseData(enrollment.course),
                       }
                     : null,
             };
