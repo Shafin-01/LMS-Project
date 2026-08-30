@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/auth";
 import RoleGuard from "@/components/RoleGuard";
@@ -16,35 +17,6 @@ interface LessonData {
   isPublished: boolean;
 }
 
-interface QuizItem {
-  id: number;
-  documentId: string;
-  Question: string;
-  OptionA: string;
-  OptionB: string;
-  OptionC: string;
-  OptionD: string;
-  CorrectAnswer: string;
-}
-
-interface QuizForm {
-  Question: string;
-  OptionA: string;
-  OptionB: string;
-  OptionC: string;
-  OptionD: string;
-  CorrectAnswer: string;
-}
-
-const EMPTY_QUIZ_FORM: QuizForm = {
-  Question: "",
-  OptionA: "",
-  OptionB: "",
-  OptionC: "",
-  OptionD: "",
-  CorrectAnswer: "",
-};
-
 function LessonManageContent({
   courseId,
   lessonId,
@@ -53,7 +25,6 @@ function LessonManageContent({
   lessonId: string;
 }) {
   const [lesson, setLesson] = useState<LessonData | null>(null);
-  const [quizzes, setQuizzes] = useState<QuizItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -64,37 +35,15 @@ function LessonManageContent({
   const [publishLoading, setPublishLoading] = useState(false);
   const [deletingLesson, setDeletingLesson] = useState(false);
 
-  const [newQuiz, setNewQuiz] = useState<QuizForm>(EMPTY_QUIZ_FORM);
-  const [addingQuiz, setAddingQuiz] = useState(false);
-  const [addQuizError, setAddQuizError] = useState("");
-
-  const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
-  const [editQuizForm, setEditQuizForm] = useState<QuizForm>(EMPTY_QUIZ_FORM);
-  const [savingQuizId, setSavingQuizId] = useState<string | null>(null);
-  const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
-
   const router = useRouter();
   const { showToast } = useToast();
-
-  const loadQuizzes = async () => {
-    // Fetching quizzes via the lesson's own findOne() populate, rather than a
-    // separate relation-filtered query (`/quizzes?filters[lesson]...`).
-    // Reason: when the lesson is in draft (unpublished) status, the separate
-    // filtered query was returning an empty array — even for the creator/Admin.
-    // The lesson's populate reliably pulls in that specific document's quizzes
-    // regardless of the lesson's publish status.
-    const res = await authFetch(`/lessons/${lessonId}`);
-    setQuizzes(res.data?.quizzes || []);
-  };
 
   const loadData = async () => {
     setError("");
     try {
       // lesson.ts's findOne() override ignores the status query param and always
       // returns the draft (most recently edited) version — which is exactly what
-      // we want in this edit form. The same response also includes the populated
-      // quizzes, so we set them directly here instead of making a separate
-      // loadQuizzes() call (saves an extra network request).
+      // we want in this edit form.
       const lessonRes = await authFetch(`/lessons/${lessonId}`);
       const lessonData = lessonRes.data;
 
@@ -118,7 +67,6 @@ function LessonManageContent({
       setTitle(lessonData.Title || "");
       setContent(lessonData.Content || "");
       setVideoUrl(lessonData.VideoURL || "");
-      setQuizzes(lessonData.quizzes || []);
     } catch (err: any) {
       setError(err.message || "Failed to load the lesson.");
     } finally {
@@ -186,87 +134,6 @@ function LessonManageContent({
     } catch (err: any) {
       showToast(err.message || "Failed to delete the lesson.", "error");
       setDeletingLesson(false);
-    }
-  };
-
-  const handleAddQuiz = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAddQuizError("");
-
-    if (!newQuiz.CorrectAnswer) {
-      setAddQuizError("Select which option is the correct answer (A/B/C/D).");
-      return;
-    }
-
-    setAddingQuiz(true);
-    try {
-      await authFetch("/quizzes", {
-        method: "POST",
-        body: JSON.stringify({
-          data: { ...newQuiz, lesson: lessonId },
-        }),
-      });
-      setNewQuiz(EMPTY_QUIZ_FORM);
-      showToast("Question added.");
-      await loadQuizzes();
-    } catch (err: any) {
-      setAddQuizError(err.message || "Failed to add the quiz question.");
-    } finally {
-      setAddingQuiz(false);
-    }
-  };
-
-  const handleStartEditQuiz = (quiz: QuizItem) => {
-    setEditingQuizId(quiz.documentId);
-    setEditQuizForm({
-      Question: quiz.Question,
-      OptionA: quiz.OptionA,
-      OptionB: quiz.OptionB,
-      OptionC: quiz.OptionC,
-      OptionD: quiz.OptionD,
-      CorrectAnswer: quiz.CorrectAnswer,
-    });
-  };
-
-  const handleCancelEditQuiz = () => {
-    setEditingQuizId(null);
-    setEditQuizForm(EMPTY_QUIZ_FORM);
-  };
-
-  const handleSaveEditQuiz = async (quizDocId: string) => {
-    if (!editQuizForm.CorrectAnswer) {
-      showToast("Select which option is the correct answer (A/B/C/D).", "error");
-      return;
-    }
-
-    setSavingQuizId(quizDocId);
-    try {
-      await authFetch(`/quizzes/${quizDocId}`, {
-        method: "PUT",
-        body: JSON.stringify({ data: editQuizForm }),
-      });
-      setEditingQuizId(null);
-      showToast("Question updated.");
-      await loadQuizzes();
-    } catch (err: any) {
-      showToast(err.message || "Failed to update the quiz question.", "error");
-    } finally {
-      setSavingQuizId(null);
-    }
-  };
-
-  const handleDeleteQuiz = async (quizDocId: string) => {
-    if (!window.confirm("Delete this quiz question?")) return;
-
-    setDeletingQuizId(quizDocId);
-    try {
-      await authFetch(`/quizzes/${quizDocId}`, { method: "DELETE" });
-      showToast("Question deleted.");
-      await loadQuizzes();
-    } catch (err: any) {
-      showToast(err.message || "Failed to delete the quiz question.", "error");
-    } finally {
-      setDeletingQuizId(null);
     }
   };
 
@@ -365,187 +232,26 @@ function LessonManageContent({
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
             />
           </div>
-          <button
-            type="submit"
-            disabled={saving}
-            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg"
-          >
-            {saving ? "Saving..." : "Save Changes"}
-          </button>
-        </form>
-
-        {/* Quiz management */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold text-white">Quiz Questions</h2>
-
-          {quizzes.length === 0 ? (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-slate-400 text-sm">
-              No quiz questions yet.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {quizzes.map((quiz, idx) => (
-                <div
-                  key={quiz.documentId}
-                  className="bg-slate-900 border border-slate-800 rounded-xl p-5"
-                >
-                  {editingQuizId === quiz.documentId ? (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1">
-                          Question
-                        </label>
-                        <input
-                          value={editQuizForm.Question}
-                          onChange={(e) =>
-                            setEditQuizForm({ ...editQuizForm, Question: e.target.value })
-                          }
-                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
-                        />
-                      </div>
-                      {(["A", "B", "C", "D"] as const).map((letter) => {
-                        const key = `Option${letter}` as keyof QuizForm;
-                        return (
-                          <div key={letter} className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name={`edit-correct-${quiz.documentId}`}
-                              checked={editQuizForm.CorrectAnswer === letter}
-                              onChange={() =>
-                                setEditQuizForm({ ...editQuizForm, CorrectAnswer: letter })
-                              }
-                              className="shrink-0"
-                            />
-                            <span className="text-xs text-slate-500 w-4">{letter}</span>
-                            <input
-                              value={editQuizForm[key]}
-                              onChange={(e) =>
-                                setEditQuizForm({ ...editQuizForm, [key]: e.target.value })
-                              }
-                              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
-                            />
-                          </div>
-                        );
-                      })}
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          onClick={() => handleSaveEditQuiz(quiz.documentId)}
-                          disabled={savingQuizId === quiz.documentId}
-                          className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg"
-                        >
-                          {savingQuizId === quiz.documentId ? "Saving..." : "Save"}
-                        </button>
-                        <button
-                          onClick={handleCancelEditQuiz}
-                          className="bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-start gap-3">
-                        <p className="text-white font-medium">
-                          {idx + 1}. {quiz.Question}
-                        </p>
-                        <div className="flex gap-2 shrink-0">
-                          <button
-                            onClick={() => handleStartEditQuiz(quiz)}
-                            className="text-sm text-indigo-400 hover:underline"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteQuiz(quiz.documentId)}
-                            disabled={deletingQuizId === quiz.documentId}
-                            className="text-sm text-red-400 hover:text-red-300 disabled:opacity-50"
-                          >
-                            {deletingQuizId === quiz.documentId ? "..." : "Delete"}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-sm">
-                        {(["A", "B", "C", "D"] as const).map((letter) => {
-                          const key = `Option${letter}` as keyof QuizItem;
-                          const isCorrect = quiz.CorrectAnswer === letter;
-                          return (
-                            <div
-                              key={letter}
-                              className={`px-3 py-1.5 rounded-lg border ${
-                                isCorrect
-                                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-                                  : "border-slate-800 bg-slate-800/50 text-slate-300"
-                              }`}
-                            >
-                              {letter}. {quiz[key]} {isCorrect && "✓"}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Add new question */}
-          <form
-            onSubmit={handleAddQuiz}
-            className="space-y-3 bg-slate-900 border border-slate-800 rounded-xl p-6"
-          >
-            <h3 className="text-sm font-bold text-white">+ Add New Question</h3>
-
-            {addQuizError && <p className="text-red-400 text-xs">{addQuizError}</p>}
-
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">Question</label>
-              <input
-                value={newQuiz.Question}
-                onChange={(e) => setNewQuiz({ ...newQuiz, Question: e.target.value })}
-                required
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
-                placeholder="Write the question..."
-              />
-            </div>
-
-            {(["A", "B", "C", "D"] as const).map((letter) => {
-              const key = `Option${letter}` as keyof QuizForm;
-              return (
-                <div key={letter} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="new-correct-answer"
-                    checked={newQuiz.CorrectAnswer === letter}
-                    onChange={() => setNewQuiz({ ...newQuiz, CorrectAnswer: letter })}
-                    className="shrink-0"
-                  />
-                  <span className="text-xs text-slate-500 w-4">{letter}</span>
-                  <input
-                    value={newQuiz[key]}
-                    onChange={(e) => setNewQuiz({ ...newQuiz, [key]: e.target.value })}
-                    required
-                    placeholder={`Option ${letter}`}
-                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
-                  />
-                </div>
-              );
-            })}
-
-            <p className="text-[11px] text-slate-500">
-              Click the radio button to select which option is the correct answer.
-            </p>
-
+          <div className="flex flex-wrap items-center gap-3 pt-1">
             <button
               type="submit"
-              disabled={addingQuiz}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium px-5 py-2.5 rounded-lg"
+              disabled={saving}
+              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg"
             >
-              {addingQuiz ? "Adding..." : "Add Question"}
+              {saving ? "Saving..." : "Save Changes"}
             </button>
-          </form>
-        </div>
+
+            {/* Quiz questions now live on their own page, kept separate from
+                this lesson-info form so editing text and managing MCQ
+                questions don't compete for space on one long page. */}
+            <Link
+              href={`/dashboard/courses/${courseId}/lessons/${lessonId}/quiz`}
+              className="rounded-lg border border-slate-700 px-5 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800"
+            >
+              Manage Quiz →
+            </Link>
+          </div>
+        </form>
       </div>
     </main>
   );

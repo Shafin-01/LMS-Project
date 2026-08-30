@@ -39,6 +39,36 @@ interface StudentProgressItem {
   percentage: number;
 }
 
+// One row of the "/quiz-results" response — same shape the Admin Panel
+// and Dashboard already fetch. Only the fields this page actually shows
+// are declared here.
+interface QuizResultEntry {
+  id: number;
+  documentId: string;
+  score: number;
+  totalQuestions: number;
+  submittedAt: string;
+  student?: { id: number } | null;
+  lesson?: {
+    id: number;
+    Title: string;
+    course?: { documentId: string } | null;
+  } | null;
+}
+
+function formatSubmittedAt(value: string): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function CourseManageContent({ courseId }: { courseId: string }) {
   const [course, setCourse] = useState<CourseData | null>(null);
   const [lessons, setLessons] = useState<LessonItem[]>([]);
@@ -53,6 +83,9 @@ function CourseManageContent({ courseId }: { courseId: string }) {
   const [error, setError] = useState("");
   const [studentProgress, setStudentProgress] = useState<StudentProgressItem[]>([]);
   const [progressLoading, setProgressLoading] = useState(true);
+  const [quizResults, setQuizResults] = useState<QuizResultEntry[]>([]);
+  const [quizResultsLoading, setQuizResultsLoading] = useState(true);
+  const [expandedStudentId, setExpandedStudentId] = useState<number | null>(null);
   const router = useRouter();
   const { showToast } = useToast();
 
@@ -72,6 +105,32 @@ function CourseManageContent({ courseId }: { courseId: string }) {
       setProgressLoading(false);
     }
   };
+
+  // The same /quiz-results endpoint the Admin Panel uses. The backend
+  // already scopes what comes back to whoever is logged in (Content
+  // Manager gets every course, Instructor only their own) — this page
+  // just further filters those rows down to this one course, then
+  // further down to one student when their row is expanded.
+  const loadQuizResults = async () => {
+    setQuizResultsLoading(true);
+    try {
+      const res = await authFetch("/quiz-results");
+      setQuizResults(res.data || []);
+    } catch {
+      setQuizResults([]);
+    } finally {
+      setQuizResultsLoading(false);
+    }
+  };
+
+  // Results for one student, scoped to this course's lessons only — a
+  // Content Manager's /quiz-results response includes every course, so
+  // without the course filter here a student's results from an unrelated
+  // course would leak into this course's panel.
+  const getStudentResultsForThisCourse = (studentId: number) =>
+    quizResults.filter(
+      (result) => result.student?.id === studentId && result.lesson?.course?.documentId === courseId
+    );
 
   const loadData = async () => {
     setError("");
@@ -134,6 +193,7 @@ function CourseManageContent({ courseId }: { courseId: string }) {
   useEffect(() => {
     loadData();
     loadStudentProgress();
+    loadQuizResults();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId]);
 
@@ -377,7 +437,13 @@ function CourseManageContent({ courseId }: { courseId: string }) {
                       href={`/dashboard/courses/${courseId}/lessons/${lesson.documentId}`}
                       className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800"
                     >
-                      Edit / Quiz
+                      Edit
+                    </Link>
+                    <Link
+                      href={`/dashboard/courses/${courseId}/lessons/${lesson.documentId}/quiz`}
+                      className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800"
+                    >
+                      Quiz
                     </Link>
                     <button
                       onClick={() => handleDeleteLesson(lesson.documentId)}
@@ -406,32 +472,83 @@ function CourseManageContent({ courseId }: { courseId: string }) {
             </div>
           ) : (
             <div className="space-y-2">
-              {studentProgress.map((entry) => (
-                <div
-                  key={entry.student.id}
-                  className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl p-4"
-                >
-                  <div className="min-w-[140px]">
-                    <p className="text-white font-medium">{entry.student.username}</p>
-                    <p className="text-xs text-slate-500">{entry.student.email}</p>
-                  </div>
+              {studentProgress.map((entry) => {
+                const isExpanded = expandedStudentId === entry.student.id;
+                const studentResults = getStudentResultsForThisCourse(entry.student.id);
 
-                  <div className="flex items-center gap-3">
-                    <div className="w-32 h-2 rounded-full bg-slate-800 overflow-hidden">
-                      <div
-                        className="h-full bg-indigo-500 rounded-full transition-all"
-                        style={{ width: `${entry.percentage}%` }}
-                      />
+                return (
+                  <div
+                    key={entry.student.id}
+                    className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+                      <div className="min-w-[140px]">
+                        <p className="text-white font-medium">{entry.student.username}</p>
+                        <p className="text-xs text-slate-500">{entry.student.email}</p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="w-32 h-2 rounded-full bg-slate-800 overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-500 rounded-full transition-all"
+                            style={{ width: `${entry.percentage}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold text-slate-200 w-11 text-right">
+                          {entry.percentage}%
+                        </span>
+                        <span className="text-xs text-slate-500 whitespace-nowrap">
+                          {entry.completedCount}/{entry.totalLessons} lessons
+                        </span>
+
+                        <button
+                          onClick={() =>
+                            setExpandedStudentId(isExpanded ? null : entry.student.id)
+                          }
+                          className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800 whitespace-nowrap"
+                        >
+                          {isExpanded ? "Hide Result" : "Quiz Result"}
+                        </button>
+                      </div>
                     </div>
-                    <span className="text-sm font-semibold text-slate-200 w-11 text-right">
-                      {entry.percentage}%
-                    </span>
-                    <span className="text-xs text-slate-500 whitespace-nowrap">
-                      {entry.completedCount}/{entry.totalLessons} lessons
-                    </span>
+
+                    {isExpanded && (
+                      <div className="border-t border-slate-800 bg-slate-950/40 p-4 space-y-2">
+                        {quizResultsLoading ? (
+                          <p className="text-slate-500 text-xs">Loading quiz results...</p>
+                        ) : studentResults.length === 0 ? (
+                          <p className="text-slate-500 text-xs">
+                            {entry.student.username} hasn't submitted any quiz in this course yet.
+                          </p>
+                        ) : (
+                          studentResults.map((result) => {
+                            const percentage =
+                              result.totalQuestions > 0
+                                ? Math.round((result.score / result.totalQuestions) * 100)
+                                : 0;
+                            return (
+                              <div
+                                key={result.id}
+                                className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                              >
+                                <span className="text-slate-300">{result.lesson?.Title || "—"}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className={`font-medium ${percentage >= 60 ? "text-emerald-400" : "text-amber-400"}`}>
+                                    {result.score}/{result.totalQuestions} ({percentage}%)
+                                  </span>
+                                  <span className="text-slate-500 text-xs">
+                                    {formatSubmittedAt(result.submittedAt)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
