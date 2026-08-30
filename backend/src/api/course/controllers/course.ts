@@ -40,7 +40,29 @@ export default factories.createCoreController(
           const enrollmentCount = await strapi.db
             .query('api::enrollment.enrollment')
             .count({ where: { course: course.id } });
-          return { ...course, enrollmentCount };
+
+          // super.find() passes through whatever the client's own
+          // ?populate= param asked for — and unlike the "instructor" and
+          // "enrollments" relations (which Strapi's built-in populate
+          // permission check correctly strips for Student/Public, since
+          // those roles have no "find" permission on Users/Enrollment),
+          // Lesson's "find" permission IS granted broadly to every
+          // authenticated role — needed so lesson.ts's own find/findOne
+          // can work for Admin/Content Manager/Instructor. That means
+          // Strapi's stripping does NOT kick in here: verified live, any
+          // logged-in user calling GET /courses?populate=lessons received
+          // every course's every lesson's full Content/VideoURL, enrolled
+          // or not — the exact paid content findOne() (below) and
+          // lesson.ts's own findOne() carefully gate behind enrollment.
+          // This list endpoint has no legitimate need to expose lesson
+          // content at all (the browse-courses page only reads
+          // Title/Description/enrollmentCount), so the relation is
+          // dropped outright here — only findOne() needs a lesson list,
+          // and it already builds one itself, safely, further down in
+          // this file.
+          const { lessons, ...safeCourse } = course;
+
+          return { ...safeCourse, enrollmentCount };
         })
       );
 
