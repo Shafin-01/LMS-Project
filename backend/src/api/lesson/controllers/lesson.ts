@@ -4,6 +4,42 @@ export default factories.createCoreController(
   'api::lesson.lesson',
   ({ strapi }) => ({
 
+    // Strapi's default core find() does NOT restrict the ?status=draft query
+    // param by role beyond the base "find" permission checkbox — so without
+    // this override, any authenticated user with lesson.find enabled
+    // (Students need it indirectly, since the dashboard's lesson list is the
+    // only caller of this endpoint... but a Student could still call it
+    // directly) could pass status=draft and see unpublished lesson content
+    // for any course, not just enrolled/published ones. Only Admin/Content
+    // Manager may list drafts for any course; an Instructor only for a
+    // single course they own (the only way this endpoint is actually
+    // called, filtered by course.documentId); everyone else always gets
+    // published-only lessons regardless of what status they request.
+    async find(ctx) {
+      const user = ctx.state.user;
+      const roleName = user?.role?.name;
+      const requestedDraft = ctx.query?.status === 'draft';
+
+      let allowDraft = roleName === 'Admin' || roleName === 'Content Manager';
+
+      if (!allowDraft && requestedDraft && roleName === 'Instructor') {
+        const filters: any = ctx.query?.filters || {};
+        const courseDocId = filters?.course?.documentId?.$eq;
+
+        if (courseDocId) {
+          const course = await strapi.documents('api::course.course').findOne({
+            documentId: courseDocId,
+            populate: ['instructor'],
+          });
+          allowDraft = course?.instructor?.id === user.id;
+        }
+      }
+
+      ctx.query = { ...ctx.query, status: requestedDraft && allowDraft ? 'draft' : 'published' };
+
+      return super.find(ctx);
+    },
+
     async findOne(ctx) {
       const user = ctx.state.user;
 

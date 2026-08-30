@@ -5,12 +5,33 @@ export default factories.createCoreController(
   'api::course.course',
   ({ strapi }) => ({
 
-    // find/findOne defer to the default core behavior (which already handles
-    // published-vs-draft visibility, populate, filters, sorting, etc. via
-    // permissions) and only add an "enrollmentCount" number onto each course.
-    // A plain count is safe to expose publicly — unlike populating the
-    // enrollments relation itself, it doesn't leak any student data.
+    // find/findOne add an "enrollmentCount" number onto each course (a plain
+    // count is safe to expose publicly — unlike populating the enrollments
+    // relation itself, it doesn't leak any student data), and — this is the
+    // important part — explicitly decide who is allowed to request the
+    // draft (unpublished) version via ?status=draft.
+    //
+    // Strapi's default core find/findOne does NOT restrict the status query
+    // param by role on its own: as long as a role has the base "find"
+    // permission checked (which Student/Public must have, so they can
+    // browse published courses), it can also pass status=draft and get
+    // unpublished courses back. Only Admin/Content Manager may see any
+    // course's draft; an Instructor may only see the draft of their OWN
+    // course; everyone else always gets published-only, no matter what
+    // status they ask for. This mirrors the same guard already applied to
+    // blog-post.ts's find/findOne.
     async find(ctx) {
+      const user = ctx.state.user;
+      const roleName = user?.role?.name;
+      const requestedDraft = ctx.query?.status === 'draft';
+
+      // Instructor is deliberately left out here: the dashboard never lists
+      // drafts through this endpoint for an Instructor (it uses the
+      // ownership-scoped myCourses() action for that), so there's no
+      // legitimate case to support and the safest default is to deny it.
+      const canListDrafts = roleName === 'Admin' || roleName === 'Content Manager';
+      ctx.query = { ...ctx.query, status: requestedDraft && canListDrafts ? 'draft' : 'published' };
+
       const result = await super.find(ctx);
       const courses = result?.data || [];
 
@@ -27,6 +48,26 @@ export default factories.createCoreController(
     },
 
     async findOne(ctx) {
+      const user = ctx.state.user;
+      const roleName = user?.role?.name;
+      const requestedDraft = ctx.query?.status === 'draft';
+
+      let allowDraft = roleName === 'Admin' || roleName === 'Content Manager';
+
+      if (!allowDraft && requestedDraft && roleName === 'Instructor') {
+        // An Instructor may see a draft only for their own course — checked
+        // by looking the course up in draft status and comparing ownership,
+        // same ownership check already used for edit/delete/publish above.
+        const draftCourse = await strapi.documents('api::course.course').findOne({
+          documentId: ctx.params.id,
+          status: 'draft',
+          populate: ['instructor'],
+        });
+        allowDraft = draftCourse?.instructor?.id === user.id;
+      }
+
+      ctx.query = { ...ctx.query, status: requestedDraft && allowDraft ? 'draft' : 'published' };
+
       const result = await super.findOne(ctx);
       if (!result?.data) return result;
 
