@@ -170,6 +170,7 @@ export default function Navbar() {
             reflow the whole row and visibly shift these links sideways for
             an instant — this keeps them pinned to the true center always. */}
         <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-7 sm:flex">
+        <NavLink href="/" label="Home" active={pathname === "/"} />
           <NavLink href="/courses" label="Courses" active={pathname.startsWith("/courses")} />
           <NavLink href="/blog" label="Blog" active={pathname.startsWith("/blog")} />
 
@@ -281,7 +282,9 @@ export default function Navbar() {
       {/* Mobile Menu Dropdown */}
       {mobileOpen && (
         <div className="border-t border-slate-800 px-4 pb-4 pt-2 sm:hidden">
+
           <nav className="flex flex-col gap-1">
+            <MobileNavLink href="/" label="Home" active={pathname === "/"} onClick={() => setMobileOpen(false)} />
             <MobileNavLink href="/courses" label="Courses" active={pathname.startsWith("/courses")} onClick={() => setMobileOpen(false)} />
             <MobileNavLink href="/blog" label="Blog" active={pathname.startsWith("/blog")} onClick={() => setMobileOpen(false)} />
 
