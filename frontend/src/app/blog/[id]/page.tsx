@@ -1,5 +1,5 @@
 import { fetchAPI } from "@/lib/api";
-import Link from "next/link";
+import BackButton from "@/components/BackButton";
 
 interface BlogAuthor {
   id: number;
@@ -49,15 +49,7 @@ export default async function BlogDetailPage({
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 space-y-4">
         <h1 className="text-2xl font-bold">Blog post not found</h1>
-        <Link 
-          href="/blog" 
-          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to Blog
-        </Link>
+        <BackButton href="/blog" label="Back to Blog" />
       </div>
     );
   }
@@ -67,16 +59,8 @@ export default async function BlogDetailPage({
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto space-y-8">
-        
-        <Link 
-          href="/blog" 
-          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to Blog
-        </Link>
+
+        <BackButton href="/blog" label="Back to Blog" />
 
         {post.CoverImageURL && (
           <img

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { authFetch, getUser } from "@/lib/auth";
 import RoleGuard from "@/components/RoleGuard";
+import { useToast } from "@/components/Toast";
 
 interface DashboardStats {
   totalCourses: number;
@@ -43,6 +44,7 @@ function AdminPanelContent() {
   const [error, setError] = useState("");
   const [updatingUserId, setUpdatingUserId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const { showToast } = useToast();
 
   const loadData = async () => {
     setError("");
@@ -69,18 +71,18 @@ function AdminPanelContent() {
     loadData();
   }, []);
 
-  const handleRoleChange = async (userId: number, newRoleId: string) => {
+  const handleRoleChange = async (userId: number, newRoleId: string, newRoleName: string) => {
     if (!newRoleId) return;
     setUpdatingUserId(userId);
-    setError("");
     try {
       await authFetch("/dashboard/users/role", {
         method: "PUT",
         body: JSON.stringify({ userId, roleId: Number(newRoleId) }),
       });
+      showToast(`Role updated to ${newRoleName}.`);
       await loadData();
     } catch (err: any) {
-      setError(err.message || "Failed to change role.");
+      showToast(err.message || "Failed to change role.", "error");
     } finally {
       setUpdatingUserId(null);
     }
@@ -91,12 +93,12 @@ function AdminPanelContent() {
       return;
     }
     setDeletingUserId(userId);
-    setError("");
     try {
       await authFetch(`/dashboard/users/${userId}`, { method: "DELETE" });
+      showToast("Account deleted.");
       await loadData();
     } catch (err: any) {
-      setError(err.message || "Failed to delete user.");
+      showToast(err.message || "Failed to delete user.", "error");
     } finally {
       setDeletingUserId(null);
     }
@@ -199,7 +201,12 @@ function AdminPanelContent() {
                           <select
                             defaultValue=""
                             disabled={updatingUserId === u.id}
-                            onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                            onChange={(e) => {
+                              const selectedRole = roles.find(
+                                (r) => String(r.id) === e.target.value
+                              );
+                              handleRoleChange(u.id, e.target.value, selectedRole?.name || "the new role");
+                            }}
                             className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-indigo-500 disabled:opacity-50"
                           >
                             <option value="" disabled>

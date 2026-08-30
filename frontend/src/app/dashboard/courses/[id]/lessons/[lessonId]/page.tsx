@@ -1,11 +1,11 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/auth";
 import RoleGuard from "@/components/RoleGuard";
 import { useToast } from "@/components/Toast";
+import BackButton from "@/components/BackButton";
 
 interface LessonData {
   id: number;
@@ -282,12 +282,7 @@ function LessonManageContent({
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="text-red-400">{error || "Lesson not found."}</p>
-        <Link
-          href={`/dashboard/courses/${courseId}`}
-          className="text-sm text-indigo-400 hover:underline"
-        >
-          ← Back to Course
-        </Link>
+        <BackButton href={`/dashboard/courses/${courseId}`} label="Back to Course" />
       </main>
     );
   }
@@ -295,12 +290,7 @@ function LessonManageContent({
   return (
     <main className="min-h-screen text-slate-100 pb-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto space-y-8">
-        <Link
-          href={`/dashboard/courses/${courseId}`}
-          className="text-sm text-indigo-400 hover:underline"
-        >
-          ← Back to Course
-        </Link>
+        <BackButton href={`/dashboard/courses/${courseId}`} label="Back to Course" />
 
         <div className="flex flex-wrap justify-between items-center gap-3">
           <div>

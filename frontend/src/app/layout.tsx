@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LMS Portal",
-  description: "A role-based Learning Management System built with Next.js and Strapi.",
+  title: "Learnix",
+  description: "Learnix is a role-based Learning Management System for courses, lessons, quizzes and progress tracking — built with Next.js and Strapi.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

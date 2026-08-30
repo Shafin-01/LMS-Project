@@ -340,8 +340,11 @@ export default factories.createCoreController(
                 (item: any) => item.documentId && courseLessonDocumentIds.has(item.documentId)
             ).length;
 
+            // A course with zero lessons has nothing left to finish, so it
+            // counts as 100% complete rather than 0% — otherwise a Student
+            // would be stuck at "0% complete" forever with no lesson to mark.
             const percentage =
-                totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+                totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 100;
 
             return {
                 message: 'Lesson marked as complete.',
@@ -419,8 +422,11 @@ export default factories.createCoreController(
                         courseLessonDocumentIds.has(completedLesson.documentId)
                 ).length;
 
+            // A course with zero lessons has nothing left to finish, so it
+            // counts as 100% complete rather than 0% — otherwise a Student
+            // would be stuck at "0% complete" forever with no lesson to mark.
             const percentage =
-                totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+                totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 100;
 
             // The frontend's MarkCompleteButton needs to know exactly which
             // lessons are completed (not just a count) so it can correctly
@@ -502,8 +508,10 @@ export default factories.createCoreController(
                     (item: any) => item.documentId && courseLessonDocumentIds.has(item.documentId)
                 ).length;
 
+                // Same zero-lessons-means-100%-complete rule as everywhere
+                // else, so this list matches what the student themself sees.
                 const percentage =
-                    totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+                    totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 100;
 
                 return {
                     student: {

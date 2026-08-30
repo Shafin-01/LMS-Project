@@ -6,6 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { authFetch, getUser } from "@/lib/auth";
 import LessonProgress from "@/components/LessonProgress";
 import MarkCompleteButton from "@/components/MarkCompleteButton";
+import BackButton from "@/components/BackButton";
 
 interface LessonData {
   id: number;
@@ -217,15 +218,7 @@ export default function LessonPage({
           <div className="bg-red-950/40 border border-red-900 rounded-xl p-6 w-full">
             <p className="text-red-400 font-medium">{error}</p>
           </div>
-          <Link
-            href={`/courses/${resolvedParams.id}`}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Course
-          </Link>
+          <BackButton href={`/courses/${resolvedParams.id}`} label="Back to Course" />
         </div>
       </main>
     );
@@ -244,15 +237,7 @@ export default function LessonPage({
       <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
         <div className="text-center flex flex-col items-center space-y-4">
           <p className="text-slate-400">Lesson not found.</p>
-          <Link
-            href={`/courses/${resolvedParams.id}`}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Course
-          </Link>
+          <BackButton href={`/courses/${resolvedParams.id}`} label="Back to Course" />
         </div>
       </main>
     );
@@ -268,15 +253,7 @@ export default function LessonPage({
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
           <div className="space-y-4">
-            <Link
-              href={`/courses/${resolvedParams.id}`}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit mb-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Back to Course
-            </Link>
+            <BackButton href={`/courses/${resolvedParams.id}`} label="Back to Course" />
 
             <h1 className="text-2xl font-bold text-white">{lesson.Title}</h1>
           </div>

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getUser, logout, StrapiUser } from "@/lib/auth";
+import LearnixLogo from "@/components/LearnixLogo";
 
 function isProtectedPath(path: string): boolean {
   return (
@@ -14,12 +15,27 @@ function isProtectedPath(path: string): boolean {
   );
 }
 
-const ROLE_TEXT_STYLES: Record<string, string> = {
-  Admin: "text-rose-400",
-  "Content Manager": "text-amber-400",
-  Instructor: "text-sky-400",
-  Student: "text-emerald-400",
+// A small colored pill for the role name, using the same "/10 background,
+// /20 ring" idiom as the avatar circle elsewhere in the app — keeps every
+// role indicator across the site visually consistent (point 10).
+const ROLE_BADGE_STYLES: Record<string, string> = {
+  Admin: "bg-rose-500/10 text-rose-300 ring-1 ring-inset ring-rose-500/20",
+  "Content Manager": "bg-amber-500/10 text-amber-300 ring-1 ring-inset ring-amber-500/20",
+  Instructor: "bg-sky-500/10 text-sky-300 ring-1 ring-inset ring-sky-500/20",
+  Student: "bg-emerald-500/10 text-emerald-300 ring-1 ring-inset ring-emerald-500/20",
 };
+
+function RoleBadge({ roleName }: { roleName: string }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+        ROLE_BADGE_STYLES[roleName] || "bg-slate-500/10 text-slate-300 ring-1 ring-inset ring-slate-500/20"
+      }`}
+    >
+      {roleName}
+    </span>
+  );
+}
 
 // Standard theme colors for all active nav links
 function NavLink({
@@ -78,40 +94,82 @@ function MobileNavLink({
 
 export default function Navbar() {
   const [user, setUser] = useState<StrapiUser | null>(null);
+  // getUser() reads from localStorage, so the real login state is only
+  // known after this component mounts on the client. Until then we render
+  // a neutral placeholder instead of "Log In / Sign Up" — otherwise every
+  // refresh would flash the logged-out buttons for an instant before
+  // switching to the signed-in avatar, which reads as if the session
+  // briefly dropped.
+  const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Whether the account dropdown (avatar + username, click to reveal
+  // "Logout") is open. Using a click-to-open menu instead of an
+  // always-visible Logout button is the standard pattern on most
+  // professional web apps, and keeps the navbar less cluttered.
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
 
   useEffect(() => {
     setUser(getUser());
+    setMounted(true);
   }, [pathname]);
 
-  // Close mobile dropdown when route changes
+  // Close mobile dropdown and the account menu when route changes
   useEffect(() => {
     setMobileOpen(false);
+    setUserMenuOpen(false);
   }, [pathname]);
+
+  // Close the account dropdown on an outside click or Escape — standard
+  // dropdown behavior so it doesn't stay open and block the page.
+  useEffect(() => {
+    if (!userMenuOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setUserMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [userMenuOpen]);
 
   const handleLogout = () => {
     logout();
     setMobileOpen(false);
+    setUserMenuOpen(false);
     window.location.href = isProtectedPath(pathname) ? "/" : pathname;
   };
 
   const roleName = user?.role?.name;
   const canManageContent =
     roleName === "Admin" || roleName === "Content Manager" || roleName === "Instructor";
-  const roleTextClass = roleName ? ROLE_TEXT_STYLES[roleName] || "text-slate-400" : "";
 
   return (
     <header className="relative rounded-2xl border border-slate-800 bg-slate-900/70 shadow-sm shadow-black/10 backdrop-blur mb-8">
-      <div className="flex items-center justify-between gap-6 px-6 py-3.5">
+      <div className="relative flex items-center justify-between gap-6 px-6 py-3.5">
         <Link href="/" className="flex shrink-0 items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
-            L
-          </span>
-          <span className="text-base font-bold tracking-tight text-white">LMS Portal</span>
+          <LearnixLogo className="h-8 w-8 shrink-0" />
+          <span className="text-base font-bold tracking-tight text-white">Learnix</span>
         </Link>
 
-        <nav className="hidden items-center gap-7 sm:flex">
+        {/* Absolutely centered instead of a normal flex sibling: its
+            position must never depend on the width of the logo or the
+            auth controls on either side. With justify-between, any width
+            change there (e.g. "Log In / Sign Up" swapping for the signed-in
+            avatar, or a role-only link like "Admin Panel" appearing) would
+            reflow the whole row and visibly shift these links sideways for
+            an instant — this keeps them pinned to the true center always. */}
+        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-7 sm:flex">
           <NavLink href="/courses" label="Courses" active={pathname.startsWith("/courses")} />
           <NavLink href="/blog" label="Blog" active={pathname.startsWith("/blog")} />
 
@@ -129,7 +187,11 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden shrink-0 items-center gap-3 sm:flex">
-          {!user && (
+          {!mounted ? (
+            // Same-height placeholder while we check localStorage, so the
+            // page doesn't flash "Log In / Sign Up" for a signed-in user.
+            <div className="h-9 w-36" />
+          ) : !user ? (
             <>
               <Link
                 href={`/login?redirect=${encodeURIComponent(pathname)}`}
@@ -144,29 +206,57 @@ export default function Navbar() {
                 Sign Up
               </Link>
             </>
-          )}
-
-          {user && (
-            <div className="flex items-center gap-4 border-l border-slate-800 pl-4">
-              <div className="flex items-center gap-3">
+          ) : (
+            // A click-to-open account menu (avatar + name, dropdown with
+            // role and Logout) instead of a permanently-visible Logout
+            // button — the standard pattern on professional web apps, and
+            // it keeps the navbar itself less busy.
+            <div ref={userMenuRef} className="relative border-l border-slate-800 pl-4">
+              <button
+                onClick={() => setUserMenuOpen((open) => !open)}
+                aria-haspopup="true"
+                aria-expanded={userMenuOpen}
+                className="flex items-center gap-2.5 rounded-lg py-1 pl-1 pr-2 transition-colors hover:bg-slate-800/60"
+              >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-sm font-semibold text-indigo-300 ring-1 ring-inset ring-indigo-500/25">
                   {user.username?.[0]?.toUpperCase() || "?"}
                 </span>
-                <div className="leading-tight">
-                  <p className="text-sm font-semibold text-white">{user.username}</p>
-                  <p className={`text-xs font-medium ${roleTextClass}`}>{roleName}</p>
-                </div>
-              </div>
-
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition-colors hover:border-red-900 hover:bg-red-950/40 hover:text-red-300"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M18 12H9m9 0l-3-3m3 3l-3 3" />
+                <span className="hidden text-left leading-tight md:block">
+                  <span className="block text-sm font-semibold text-white">{user.username}</span>
+                </span>
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${userMenuOpen ? "rotate-180" : ""}`}
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
+                    clipRule="evenodd"
+                  />
                 </svg>
-                Logout
               </button>
+
+              {userMenuOpen && (
+                <div className="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-slate-800 bg-slate-900 p-1.5 shadow-lg shadow-black/30">
+                  <div className="px-2.5 py-2">
+                    <p className="truncate text-sm font-semibold text-white">{user.username}</p>
+                    <div className="mt-1.5">
+                      <RoleBadge roleName={roleName || ""} />
+                    </div>
+                  </div>
+                  <div className="my-1 border-t border-slate-800" />
+                  <button
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-red-950/40 hover:text-red-300"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M18 12H9m9 0l-3-3m3 3l-3 3" />
+                    </svg>
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -236,7 +326,9 @@ export default function Navbar() {
                   </span>
                   <div className="leading-tight">
                     <p className="text-sm font-semibold text-white">{user.username}</p>
-                    <p className={`text-xs font-medium ${roleTextClass}`}>{roleName}</p>
+                    <div className="mt-1">
+                      <RoleBadge roleName={roleName || ""} />
+                    </div>
                   </div>
                 </div>
 

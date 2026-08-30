@@ -58,7 +58,9 @@ function blocksExcerpt(body: any, maxLength = 110): string {
 // match what the course page and My Courses show for the same enrollment.
 function computeProgress(enrollment: EnrollmentEntry): number {
   const totalLessons = enrollment.course?.lessons?.length || 0;
-  if (totalLessons === 0) return 0;
+  // A course with no lessons yet has nothing left to finish, so it counts
+  // as 100% complete rather than being stuck at 0% forever.
+  if (totalLessons === 0) return 100;
 
   const lessonDocumentIds = new Set(
     (enrollment.course.lessons || []).map((lesson) => lesson.documentId).filter(Boolean)
@@ -71,26 +73,21 @@ function computeProgress(enrollment: EnrollmentEntry): number {
   return Math.round((completedCount / totalLessons) * 100);
 }
 
-// One role-relevant shortcut for the logged-in hero — everything else is
-// already reachable from the Navbar, so the hero doesn't need to repeat it.
-const HERO_QUICK_LINK: Record<string, { href: string; label: string }> = {
-  Admin: { href: "/admin", label: "Go to Admin Panel" },
-  "Content Manager": { href: "/dashboard", label: "Go to Dashboard" },
-  Instructor: { href: "/dashboard", label: "Go to Dashboard" },
-  Student: { href: "/my-courses", label: "Go to My Courses" },
-};
-
 export default function Home() {
   const [user, setUser] = useState<StrapiUser | null>(null);
   const [posts, setPosts] = useState<BlogPost[] | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentEntry[] | null>(null);
 
   // getUser() reads from localStorage, so login state is only known after
-  // the component mounts on the client. The initial state (null) matches
-  // what a server render would show — the logged-out layout — so there is
-  // no hydration mismatch when this effect updates it a moment later.
+  // the component mounts on the client. Rather than rendering the
+  // logged-out marketing page first and then swapping to the logged-in
+  // view a moment later (a visible "flash" of the wrong page on every
+  // refresh), we hold off on rendering either version until "mounted" is
+  // true — see the loading guard below.
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setUser(getUser());
+    setMounted(true);
   }, []);
 
   const loggedIn = !!user;
@@ -142,13 +139,24 @@ export default function Home() {
     };
   }, [loggedIn]);
 
+  // Show a brief, neutral loading state instead of guessing "logged out"
+  // for the first frame — the logged-in and logged-out homepages look
+  // completely different, so guessing wrong would flash the whole page.
+  if (!mounted) {
+    return (
+      <main className="min-h-screen flex items-center justify-center text-slate-100">
+        <p className="text-slate-400">Loading…</p>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen text-slate-100">
       {/* Hero */}
       <section className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center space-y-6">
           <span className="inline-block px-3 py-1 text-xs font-semibold tracking-wider text-indigo-400 uppercase bg-indigo-500/10 border border-indigo-500/20 rounded-full">
-            Learning Management System
+            Learnix — A Learning Management System
           </span>
 
           {loggedIn ? (
@@ -159,18 +167,9 @@ export default function Home() {
               <p className="text-lg text-slate-400 max-w-2xl mx-auto">
                 Pick up where you left off, or explore something new in the course catalog.
               </p>
-
-              {/* The Navbar already links to Courses, My Courses, Dashboard and
-                  Admin Panel, so the hero only needs one role-relevant shortcut
-                  rather than repeating every nav link down here too. */}
-              <div className="pt-2">
-                <Link
-                  href={HERO_QUICK_LINK[roleName || ""]?.href || "/courses"}
-                  className="inline-block bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-3 rounded-lg transition-colors"
-                >
-                  {HERO_QUICK_LINK[roleName || ""]?.label || "Browse Courses"}
-                </Link>
-              </div>
+              {/* No button here on purpose — the Navbar already links to
+                  Courses, My Courses, Dashboard and Admin Panel, so
+                  repeating one of them in the hero would be redundant. */}
             </>
           ) : (
             <>
@@ -178,9 +177,10 @@ export default function Home() {
                 Learn new skills, one course at a time.
               </h1>
               <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-                LMS Portal brings courses, lessons, quizzes and progress tracking together
-                in one place — built for learners who want structure, and instructors who
-                want a simple way to teach.
+                Learnix brings courses, lessons, quizzes and progress tracking into one
+                connected workspace — so learners always know what's next, and instructors
+                can build and manage a course without fighting the tools that are supposed
+                to help them.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
                 <Link
@@ -238,7 +238,7 @@ export default function Home() {
                       />
                     ) : (
                       <div className="w-full h-36 bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-900 flex items-center justify-center">
-                        <span className="text-xl font-extrabold text-indigo-500/30">LMS</span>
+                        <span className="text-xl font-extrabold text-indigo-500/30">Learnix</span>
                       </div>
                     )}
                     <div className="p-5 space-y-2">

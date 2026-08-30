@@ -1,12 +1,12 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authFetch, uploadImage } from "@/lib/auth";
 import { toBlocks, blocksToText } from "@/lib/api";
 import RoleGuard from "@/components/RoleGuard";
 import { useToast } from "@/components/Toast";
+import BackButton from "@/components/BackButton";
 
 function EditBlogPostForm({ postId }: { postId: string }) {
   const [title, setTitle] = useState("");
@@ -115,7 +115,7 @@ function EditBlogPostForm({ postId }: { postId: string }) {
     setError("");
     try {
       await authFetch(`/blog-posts/${postId}`, { method: "DELETE" });
-      router.push("/dashboard/blog");
+      router.push("/dashboard");
     } catch (err: any) {
       showToast(err.message || "Failed to delete.", "error");
       setDeleting(false);
@@ -134,9 +134,7 @@ function EditBlogPostForm({ postId }: { postId: string }) {
     <main className="min-h-screen text-slate-100 pb-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto space-y-6 pt-8">
         <div className="flex items-center justify-between">
-          <Link href="/dashboard/blog" className="text-sm text-indigo-400 hover:underline">
-            ← Back to Blog Posts
-          </Link>
+          <BackButton href="/dashboard" label="Back to Dashboard" />
           <span
             className={`text-xs font-medium px-2 py-0.5 rounded-full ${
               isPublished ? "bg-green-500/10 text-green-400" : "bg-yellow-500/10 text-yellow-400"
@@ -240,19 +238,25 @@ function EditBlogPostForm({ postId }: { postId: string }) {
           </button>
         </form>
 
+        {/* Same pill-button styling as the course edit page's top action bar
+            (Publish/Unpublish + Delete Course), instead of underlined text
+            links — keeps every "single item management" page in the app
+            using one consistent action-button language. */}
         <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl p-4">
           <button
+            type="button"
             onClick={handleToggle}
             disabled={toggling}
-            className="text-sm font-medium text-indigo-400 hover:underline disabled:opacity-50"
+            className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800 disabled:opacity-50"
           >
             {toggling ? "..." : isPublished ? "Unpublish" : "Publish"}
           </button>
 
           <button
+            type="button"
             onClick={handleDelete}
             disabled={deleting}
-            className="text-sm font-medium text-red-400 hover:underline disabled:opacity-50"
+            className="bg-red-600/10 hover:bg-red-600/20 disabled:opacity-50 text-red-400 text-sm font-medium px-4 py-2 rounded-lg"
           >
             {deleting ? "Deleting..." : "Delete Post"}
           </button>

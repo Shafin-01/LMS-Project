@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/auth";
+import { useToast } from "@/components/Toast";
 
 interface MarkCompleteButtonProps {
   enrollmentId: number | string;
@@ -28,6 +29,7 @@ export default function MarkCompleteButton({
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [done, setDone] = useState(false);
+  const { showToast } = useToast();
 
   /*
    * Check whether this lesson is already completed.
@@ -153,9 +155,13 @@ export default function MarkCompleteButton({
     } catch (err: any) {
       console.error("Failed to complete lesson:", err);
 
-      alert(
+      // A styled toast instead of a native browser alert() — matches the
+      // feedback pattern used for every other action in the app (publish,
+      // delete, role change, etc.) instead of an inconsistent popup.
+      showToast(
         err?.message ||
-          "This lesson could not be marked as complete. Please try again."
+          "This lesson could not be marked as complete. Please try again.",
+        "error"
       );
     } finally {
       setLoading(false);

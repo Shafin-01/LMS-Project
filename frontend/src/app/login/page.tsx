@@ -91,7 +91,7 @@ function LoginForm() {
                     </h2>
 
                     <p className="text-sm text-slate-400">
-                        Sign in to your LMS account
+                        Sign in to your Learnix account
                     </p>
                 </div>
 

@@ -6,6 +6,7 @@ import RoleGuard from "@/components/RoleGuard";
 import { authFetch, getUser } from "@/lib/auth";
 import { blocksToText } from "@/lib/api";
 import { useToast } from "@/components/Toast";
+import BlogPostManageList from "@/components/BlogPostManageList";
 
 interface Lesson {
   id: number;
@@ -26,6 +27,43 @@ interface Course {
   instructor?: Instructor;
   lessons?: Lesson[];
   isPublished: boolean;
+}
+
+// Small plus icon used on both "New Course" / "New Post" buttons below,
+// replacing the old plain "+" character with something that matches the
+// stroke-icon style used across the rest of the app (e.g. BackButton).
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 shrink-0">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+    </svg>
+  );
+}
+
+// Small heading row shared by both dashboard columns — a section title on
+// the left and its "create new" action on the right, so "My Courses" and
+// "My Blogs" read as two parallel, equally-weighted sections.
+function SectionHeader({
+  title,
+  newHref,
+  newLabel,
+}: {
+  title: string;
+  newHref: string;
+  newLabel: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 className="text-xl font-bold text-white">{title}</h2>
+      <Link
+        href={newHref}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+      >
+        <PlusIcon />
+        {newLabel}
+      </Link>
+    </div>
+  );
 }
 
 function CourseCard({
@@ -178,65 +216,57 @@ function DashboardContent() {
             Dashboard
           </h1>
           <p className="text-slate-400">
-            Manage your courses, lessons, and quizzes from here.
+            Manage your courses, lessons, quizzes and blogs from here.
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
-            {canManageBlog && (
-              <Link
-                href="/dashboard/blog"
-                className="bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors"
-              >
-                Manage Blog Posts
-              </Link>
-            )}
-            <Link
-              href="/dashboard/courses/new"
-              className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors"
-            >
-              + New Course
-            </Link>
-          </div>
         </div>
 
-        {loading && (
-          <div className="text-center py-10">
-            <p className="text-slate-400">Loading courses...</p>
-          </div>
-        )}
+        {/* Two sections side by side — "My Courses" and (for Admin /
+            Content Manager only) "My Blogs" — each with its own heading,
+            its own "create new" action, and its own full manageable list
+            underneath, instead of one mixed row of buttons up top. */}
+        <div className={`grid grid-cols-1 gap-10 ${canManageBlog ? "lg:grid-cols-2 lg:gap-8" : ""}`}>
+          <div className="space-y-4">
+            <SectionHeader title="My Courses" newHref="/dashboard/courses/new" newLabel="New Course" />
 
-        {!loading && error && (
-          <div className="bg-red-950/40 border border-red-900 rounded-xl p-4 text-center max-w-2xl mx-auto">
-            <p className="text-red-400">{error}</p>
-          </div>
-        )}
+            {loading && <p className="text-slate-400 text-sm">Loading courses...</p>}
 
-        {!loading && !error && courses.length === 0 && (
-          <div className="text-center py-20 bg-slate-900 rounded-2xl border border-slate-800">
-            <p className="text-slate-400 text-lg mb-4">
-              No courses have been created yet.
-            </p>
-            <Link
-              href="/dashboard/courses/new"
-              className="text-indigo-400 hover:underline"
-            >
-              Create your first course →
-            </Link>
-          </div>
-        )}
+            {!loading && error && (
+              <div className="bg-red-950/40 border border-red-900 rounded-xl p-4">
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            )}
 
-        {!loading && !error && courses.length > 0 && (
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-6 lg:gap-8">
-            {courses.map((course) => (
-              <CourseCard
-                key={course.documentId}
-                course={course}
-                isBusy={busyId === course.documentId}
-                onTogglePublish={() => handleTogglePublish(course)}
-                onDelete={() => handleDelete(course)}
-              />
-            ))}
+            {!loading && !error && courses.length === 0 && (
+              <div className="text-center py-16 bg-slate-900 rounded-2xl border border-slate-800">
+                <p className="text-slate-400 mb-3">No courses have been created yet.</p>
+                <Link href="/dashboard/courses/new" className="text-indigo-400 hover:underline text-sm">
+                  Create your first course →
+                </Link>
+              </div>
+            )}
+
+            {!loading && !error && courses.length > 0 && (
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">
+                {courses.map((course) => (
+                  <CourseCard
+                    key={course.documentId}
+                    course={course}
+                    isBusy={busyId === course.documentId}
+                    onTogglePublish={() => handleTogglePublish(course)}
+                    onDelete={() => handleDelete(course)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        )}
+
+          {canManageBlog && (
+            <div className="space-y-4">
+              <SectionHeader title="My Blogs" newHref="/dashboard/blog/new" newLabel="New Post" />
+              <BlogPostManageList />
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );

@@ -62,6 +62,18 @@ export default function LessonList({
     );
   }
 
+  // While access is still being checked, every lesson would otherwise
+  // render as "Locked" by default (a false flash for someone who actually
+  // has access) before flipping to unlocked a moment later. Showing a
+  // neutral placeholder here avoids that misleading swap.
+  if (access === "checking") {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-center text-sm text-slate-400">
+        Checking your access…
+      </div>
+    );
+  }
+
   const unlocked = access === "unlocked";
 
   return (
@@ -105,23 +117,6 @@ export default function LessonList({
                 </span>
               </div>
               
-              {/* Button design update starts here */}
-              {unlocked ? (
-                <span className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-indigo-300 bg-slate-800/50 border border-slate-700 rounded-md group-hover:bg-slate-800 transition-colors">
-                  Watch Lesson
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-500 bg-slate-800/30 border border-slate-800/50 rounded-md">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  Locked
-                </span>
-              )}
-              {/* Button design update ends here */}
             </>
           );
           

@@ -7,6 +7,7 @@ import { authFetch } from "@/lib/auth";
 import { toBlocks, blocksToText } from "@/lib/api";
 import RoleGuard from "@/components/RoleGuard";
 import { useToast } from "@/components/Toast";
+import BackButton from "@/components/BackButton";
 
 interface LessonItem {
   id: number;
@@ -204,9 +205,7 @@ function CourseManageContent({ courseId }: { courseId: string }) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="text-red-400">{error || "Course not found."}</p>
-        <Link href="/dashboard" className="text-sm text-indigo-400 hover:underline">
-          ← Back to Dashboard
-        </Link>
+        <BackButton href="/dashboard" label="Back to Dashboard" />
       </main>
     );
   }
@@ -214,9 +213,7 @@ function CourseManageContent({ courseId }: { courseId: string }) {
   return (
     <main className="min-h-screen text-slate-100 pb-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto space-y-8">
-        <Link href="/dashboard" className="text-sm text-indigo-400 hover:underline">
-          ← Back to Dashboard
-        </Link>
+        <BackButton href="/dashboard" label="Back to Dashboard" />
 
         <div className="flex flex-wrap justify-between items-center gap-3">
           <div>

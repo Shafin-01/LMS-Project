@@ -1,10 +1,10 @@
 "use client";
 
 import { use, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/auth";
 import RoleGuard from "@/components/RoleGuard";
+import BackButton from "@/components/BackButton";
 
 function NewLessonForm({ courseId }: { courseId: string }) {
   const [title, setTitle] = useState("");
@@ -47,9 +47,7 @@ function NewLessonForm({ courseId }: { courseId: string }) {
   return (
     <main className="min-h-screen text-slate-100 pb-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto space-y-6">
-        <Link href={`/dashboard/courses/${courseId}`} className="text-sm text-indigo-400 hover:underline">
-          ← Back to Course
-        </Link>
+        <BackButton href={`/dashboard/courses/${courseId}`} label="Back to Course" />
 
         <h1 className="text-2xl font-bold text-white">New Lesson</h1>
 

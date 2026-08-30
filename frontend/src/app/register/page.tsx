@@ -61,7 +61,7 @@ function RegisterForm() {
             <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-xl space-y-6">
                 <div className="text-center space-y-2">
                     <h2 className="text-2xl font-bold text-white">Create an Account</h2>
-                    <p className="text-sm text-slate-400">Sign up to get started with LMS Portal</p>
+                    <p className="text-sm text-slate-400">Sign up to get started with Learnix</p>
                 </div>
 
                 {error && (

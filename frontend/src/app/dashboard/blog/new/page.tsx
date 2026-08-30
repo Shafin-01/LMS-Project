@@ -1,12 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authFetch, uploadImage } from "@/lib/auth";
 import { toBlocks } from "@/lib/api";
 import RoleGuard from "@/components/RoleGuard";
 import { useToast } from "@/components/Toast";
+import BackButton from "@/components/BackButton";
 
 function NewBlogPostForm() {
   const [title, setTitle] = useState("");
@@ -58,7 +58,7 @@ function NewBlogPostForm() {
       });
 
       showToast("Blog post created.");
-      router.push("/dashboard/blog");
+      router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "Failed to create blog post.");
       setSaving(false);
@@ -68,9 +68,7 @@ function NewBlogPostForm() {
   return (
     <main className="min-h-screen text-slate-100 pb-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto space-y-6 pt-8">
-        <Link href="/dashboard/blog" className="text-sm text-indigo-400 hover:underline">
-          ← Back to Blog Posts
-        </Link>
+        <BackButton href="/dashboard" label="Back to Dashboard" />
 
         <h1 className="text-2xl font-bold text-white">New Blog Post</h1>
 

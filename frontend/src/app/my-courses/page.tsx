@@ -28,7 +28,9 @@ interface EnrollmentsResponse {
 // match what the course page itself shows for the same enrollment.
 function computeProgress(enrollment: EnrollmentEntry): number {
   const totalLessons = enrollment.course?.lessons?.length || 0;
-  if (totalLessons === 0) return 0;
+  // A course with no lessons yet has nothing left to finish, so it counts
+  // as 100% complete rather than being stuck at 0% forever.
+  if (totalLessons === 0) return 100;
 
   const lessonDocumentIds = new Set(
     (enrollment.course.lessons || []).map((lesson) => lesson.documentId).filter(Boolean)
@@ -65,12 +67,10 @@ function CourseProgressCard({ enrollment }: { enrollment: EnrollmentEntry }) {
             style={{ width: `${percentage}%` }}
           />
         </div>
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-slate-500">{percentage}% complete</p>
-          <span className="text-xs font-medium text-indigo-400">
-            {completed ? "Review Course →" : "Continue Learning →"}
-          </span>
-        </div>
+        {/* The whole card is already a link to the course, so a second
+            "Continue Learning" / "Review Course" link here was a redundant
+            click target saying the same thing twice. */}
+        <p className="text-xs text-slate-500">{percentage}% complete</p>
       </div>
     </Link>
   );

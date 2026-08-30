@@ -1,9 +1,9 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authFetch, getUser } from "@/lib/auth";
+import BackButton from "@/components/BackButton";
 
 interface QuizItem {
   id: number;
@@ -298,15 +298,7 @@ export default function QuizPage({
               You need to enroll in this course before you can take this quiz.
             </p>
           </div>
-          <Link
-            href={`/courses/${resolvedParams.id}`}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Course
-          </Link>
+          <BackButton href={`/courses/${resolvedParams.id}`} label="Back to Course" />
         </div>
       </main>
     );
@@ -319,15 +311,10 @@ export default function QuizPage({
           <div className="bg-red-950/40 border border-red-900 rounded-xl p-6 w-full">
             <p className="text-red-400 font-medium">{error || "Lesson not found."}</p>
           </div>
-          <Link
+          <BackButton
             href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Lesson
-          </Link>
+            label="Back to Lesson"
+          />
         </div>
       </main>
     );
@@ -338,15 +325,10 @@ export default function QuizPage({
       <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
         <div className="max-w-md text-center flex flex-col items-center space-y-5">
           <p className="text-slate-400">This lesson does not have a quiz yet.</p>
-          <Link
+          <BackButton
             href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Lesson
-          </Link>
+            label="Back to Lesson"
+          />
         </div>
       </main>
     );
@@ -357,15 +339,10 @@ export default function QuizPage({
     return (
       <main className="min-h-screen bg-slate-950 text-white py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto space-y-6">
-          <Link
+          <BackButton
             href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Lesson
-          </Link>
+            label="Back to Lesson"
+          />
 
           <div>
             <h1 className="text-2xl font-bold text-white">Quiz: {lesson.Title}</h1>
@@ -424,15 +401,10 @@ export default function QuizPage({
     return (
       <main className="min-h-screen bg-slate-950 text-white py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto space-y-6">
-          <Link
+          <BackButton
             href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Lesson
-          </Link>
+            label="Back to Lesson"
+          />
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-4">
             <h1 className="text-2xl font-bold text-white">You have already taken this quiz</h1>
@@ -539,15 +511,10 @@ export default function QuizPage({
   return (
     <main className="min-h-screen bg-slate-950 text-white py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto space-y-6">
-        <Link
+        <BackButton
           href={`/courses/${resolvedParams.id}/lessons/${resolvedParams.lessonId}`}
-          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-slate-800/50 border border-slate-700 rounded-md hover:bg-slate-800 transition-colors w-fit"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to Lesson
-        </Link>
+          label="Back to Lesson"
+        />
 
         <div>
           <h1 className="text-2xl font-bold text-white">Quiz: {lesson.Title}</h1>
