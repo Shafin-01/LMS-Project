@@ -4,35 +4,59 @@ export default factories.createCoreController(
   'api::lesson.lesson',
   ({ strapi }) => ({
 
-    // Strapi's default core find() does NOT restrict the ?status=draft query
-    // param by role beyond the base "find" permission checkbox — so without
-    // this override, any authenticated user with lesson.find enabled
-    // (Students need it indirectly, since the dashboard's lesson list is the
-    // only caller of this endpoint... but a Student could still call it
-    // directly) could pass status=draft and see unpublished lesson content
-    // for any course, not just enrolled/published ones. Only Admin/Content
-    // Manager may list drafts for any course; an Instructor only for a
-    // single course they own (the only way this endpoint is actually
-    // called, filtered by course.documentId); everyone else always gets
-    // published-only lessons regardless of what status they request.
+    // This endpoint returns full lesson Content/VideoURL — the exact same
+    // paid content findOne() gates behind an enrollment (or ownership)
+    // check. It is only ever called by the course-management dashboard
+    // (Admin/Content Manager/Instructor), always scoped to one course via
+    // filters[course][documentId][$eq]. Without the role gate below, ANY
+    // authenticated user — including a Student enrolled in zero courses —
+    // could call GET /api/lessons directly (no lessonId needed, no course
+    // filter required) and read every published lesson's full Content and
+    // VideoURL platform-wide in one request, completely bypassing the
+    // enrollment check findOne() enforces. This was verified live: a fresh
+    // Student account was able to fetch every course's published lesson
+    // content this way before this fix.
+    //
+    // Admin/Content Manager may list any course's lessons, draft or
+    // published. An Instructor may only list lessons for a course they own
+    // (checked below, for both draft and published requests — the
+    // ownership check previously only ran for a draft request, leaving an
+    // Instructor able to bulk-read another instructor's published lesson
+    // content through this same gap). Everyone else is rejected outright.
     async find(ctx) {
       const user = ctx.state.user;
-      const roleName = user?.role?.name;
-      const requestedDraft = ctx.query?.status === 'draft';
 
+      if (!user) {
+        return ctx.unauthorized('Login is required.');
+      }
+
+      const roleName = user.role?.name;
+
+      if (!['Admin', 'Content Manager', 'Instructor'].includes(roleName)) {
+        return ctx.forbidden('You do not have permission to view lessons this way.');
+      }
+
+      const requestedDraft = ctx.query?.status === 'draft';
       let allowDraft = roleName === 'Admin' || roleName === 'Content Manager';
 
-      if (!allowDraft && requestedDraft && roleName === 'Instructor') {
+      if (roleName === 'Instructor') {
         const filters: any = ctx.query?.filters || {};
         const courseDocId = filters?.course?.documentId?.$eq;
 
-        if (courseDocId) {
-          const course = await strapi.documents('api::course.course').findOne({
-            documentId: courseDocId,
-            populate: ['instructor'],
-          });
-          allowDraft = course?.instructor?.id === user.id;
+        if (!courseDocId) {
+          return ctx.forbidden('A course filter is required.');
         }
+
+        const course = await strapi.documents('api::course.course').findOne({
+          documentId: courseDocId,
+          populate: ['instructor'],
+        });
+
+        if (!course || course.instructor?.id !== user.id) {
+          return ctx.forbidden('You can only view lessons in your own courses.');
+        }
+
+        allowDraft = requestedDraft;
       }
 
       ctx.query = { ...ctx.query, status: requestedDraft && allowDraft ? 'draft' : 'published' };
@@ -291,7 +315,13 @@ export default factories.createCoreController(
         return ctx.forbidden('You can only delete lessons in your own courses.');
       }
 
-      // super.delete() only removes theals, and documentId is
+      // super.delete() only removes the Lesson row itself — Strapi does not
+      // cascade-delete related content on its own, so without this, deleting
+      // a lesson would leave its quizzes and quiz-results behind as orphans
+      // still pointing at a lesson that no longer exists. Filtered by the
+      // lesson's documentId rather than its numeric id — a relation
+      // connected via documentId can resolve against either the draft or
+      // published row depending on Strapi's internals, and documentId is
       // the one identifier that's stable across both.
       const quizzes = await strapi.documents('api::quiz.quiz').findMany({
         filters: { lesson: { documentId: { $eq: lesson.documentId } } },
