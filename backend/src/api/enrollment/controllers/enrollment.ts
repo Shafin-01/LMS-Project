@@ -3,7 +3,34 @@ import { sanitizeUser } from '../../../utils/sanitize-user';
 
 export default factories.createCoreController(
     'api::enrollment.enrollment',
-    ({ strapi }) => ({
+    ({ strapi }) => {
+
+        // strapi.documents('api::lesson.lesson').findMany()/.findOne() default
+        // to the DRAFT row whenever "status" isn't specified — including when
+        // a lesson is only reached indirectly, by populating it through a
+        // course (e.g. course: { populate: { lessons: true } } below). Left
+        // alone, that means every lesson/progress count in this file — total
+        // lesson count, completed count, percentage — would be computed off
+        // whatever an Instructor has mid-edited but not yet published, not
+        // off what a Student can actually see and complete. This helper is
+        // the one place that asks for the real, published lesson list for a
+        // course, so every function below can replace a populated (draft-
+        // defaulting) course.lessons with this instead of trusting it as-is.
+        const getPublishedLessons = async (courseDocumentId: string) => {
+            if (!courseDocumentId) return [];
+            const lessons = await strapi.documents('api::lesson.lesson').findMany({
+                status: 'published',
+                filters: { course: { documentId: { $eq: courseDocumentId } } },
+                fields: ['Title'],
+            });
+            return lessons.map((lesson: any) => ({
+                id: lesson.id,
+                documentId: lesson.documentId,
+                Title: lesson.Title,
+            }));
+        };
+
+        return {
 
         async create(ctx) {
             return ctx.forbidden(
@@ -142,6 +169,10 @@ export default factories.createCoreController(
                 data: {
                     ...createdEnrollment,
                     student: sanitizeUser(createdEnrollment.student),
+                    course: {
+                        ...createdEnrollment.course,
+                        lessons: await getPublishedLessons(createdEnrollment.course.documentId),
+                    },
                 },
             };
         },
@@ -171,10 +202,18 @@ export default factories.createCoreController(
                     },
                 });
 
-            const sanitizedEnrollments = enrollments.map((enrollment: any) => ({
-                ...enrollment,
-                student: sanitizeUser(enrollment.student),
-            }));
+            const sanitizedEnrollments = await Promise.all(
+                enrollments.map(async (enrollment: any) => ({
+                    ...enrollment,
+                    student: sanitizeUser(enrollment.student),
+                    course: enrollment.course
+                        ? {
+                              ...enrollment.course,
+                              lessons: await getPublishedLessons(enrollment.course.documentId),
+                          }
+                        : enrollment.course,
+                }))
+            );
 
             return { data: sanitizedEnrollments };
         },
@@ -221,11 +260,20 @@ export default factories.createCoreController(
                     },
                 });
 
-            const enrollment = enrollments[0] || null;
+            const enrollment: any = enrollments[0] || null;
 
             return {
                 data: enrollment
-                    ? { ...enrollment, student: sanitizeUser(enrollment.student) }
+                    ? {
+                          ...enrollment,
+                          student: sanitizeUser(enrollment.student),
+                          course: enrollment.course
+                              ? {
+                                    ...enrollment.course,
+                                    lessons: await getPublishedLessons(enrollment.course.documentId),
+                                }
+                              : enrollment.course,
+                      }
                     : null,
             };
         },
@@ -278,6 +326,7 @@ export default factories.createCoreController(
                 .documents('api::lesson.lesson')
                 .findOne({
                     documentId: lessonId,
+                    status: 'published',
                     populate: { course: true },
                 });
 
@@ -317,23 +366,22 @@ export default factories.createCoreController(
                     });
             }
 
-            const updatedEnrollment = await strapi
+            const updatedEnrollment: any = await strapi
                 .documents('api::enrollment.enrollment')
                 .findOne({
                     documentId: id,
                     populate: {
-                        course: { populate: { lessons: true } },
+                        course: true,
                         completedLessons: true,
                     },
                 });
 
-            const totalLessons = updatedEnrollment?.course?.lessons?.length || 0;
+            const publishedLessons = await getPublishedLessons(updatedEnrollment?.course?.documentId);
+            const totalLessons = publishedLessons.length;
             const completedLessons = updatedEnrollment?.completedLessons || [];
 
             const courseLessonDocumentIds = new Set(
-                (updatedEnrollment?.course?.lessons || [])
-                    .map((item: any) => item.documentId)
-                    .filter(Boolean)
+                publishedLessons.map((item: any) => item.documentId).filter(Boolean)
             );
 
             const completedCount = completedLessons.filter(
@@ -370,7 +418,7 @@ export default factories.createCoreController(
                 return ctx.badRequest('enrollmentId is required.');
             }
 
-            const enrollment = await strapi
+            const enrollment: any = await strapi
                 .documents('api::enrollment.enrollment')
                 .findOne({
                     documentId: id,
@@ -378,7 +426,7 @@ export default factories.createCoreController(
                         student: true,
                         completedLessons: true,
                         course: {
-                            populate: { lessons: true, instructor: true },
+                            populate: { instructor: true },
                         },
                     },
                 });
@@ -407,12 +455,11 @@ export default factories.createCoreController(
                 return ctx.badRequest('No valid course found for this enrollment.');
             }
 
-            const totalLessons = enrollment.course.lessons?.length || 0;
+            const publishedLessons = await getPublishedLessons(enrollment.course.documentId);
+            const totalLessons = publishedLessons.length;
 
             const courseLessonDocumentIds = new Set(
-                (enrollment.course.lessons || [])
-                    .map((lesson: any) => lesson.documentId)
-                    .filter(Boolean)
+                publishedLessons.map((lesson: any) => lesson.documentId).filter(Boolean)
             );
 
             const completedCount =
@@ -480,7 +527,7 @@ export default factories.createCoreController(
                 .documents('api::course.course')
                 .findOne({
                     documentId: courseId,
-                    populate: { lessons: true, instructor: true },
+                    populate: { instructor: true },
                 });
 
             if (!course) {
@@ -498,9 +545,10 @@ export default factories.createCoreController(
                     populate: { student: true, completedLessons: true },
                 });
 
-            const totalLessons = course.lessons?.length || 0;
+            const publishedLessons = await getPublishedLessons(course.documentId);
+            const totalLessons = publishedLessons.length;
             const courseLessonDocumentIds = new Set(
-                (course.lessons || []).map((lesson: any) => lesson.documentId).filter(Boolean)
+                publishedLessons.map((lesson: any) => lesson.documentId).filter(Boolean)
             );
 
             const data = enrollments.map((enrollment: any) => {
@@ -528,5 +576,6 @@ export default factories.createCoreController(
             return { data };
         },
 
-    })
+        };
+    }
 );

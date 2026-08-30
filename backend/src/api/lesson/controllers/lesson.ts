@@ -57,20 +57,53 @@ export default factories.createCoreController(
         );
       }
 
-      const lesson = await strapi
+      const roleName = user.role?.name;
+      const canViewAnyDraft = roleName === 'Admin' || roleName === 'Content Manager';
+
+      // strapi.documents().findOne() defaults to the DRAFT row when no
+      // "status" is given — so without asking for 'published' explicitly
+      // here, an enrolled Student (or anyone who knows/guesses a lessonId)
+      // could read a lesson's Content/VideoURL before it was ever
+      // published, completely bypassing the Publish step. Only Admin/
+      // Content Manager (any lesson) or the Instructor who owns the
+      // lesson's course (previewing their own draft) may see the draft
+      // version; everyone else only ever gets the published one.
+      let lesson: any = await strapi
         .documents('api::lesson.lesson')
         .findOne({
           documentId: lessonId,
+          status: 'published',
           populate: ['course', 'quizzes'],
         });
+
+      if (!lesson) {
+        const draftLesson: any = await strapi
+          .documents('api::lesson.lesson')
+          .findOne({
+            documentId: lessonId,
+            status: 'draft',
+            // "instructor" is populated one level deeper here (unlike the
+            // published branch above) purely to check ownership below — it
+            // is deleted back off before the lesson is used any further, so
+            // it never reaches the response.
+            populate: { course: { populate: ['instructor'] }, quizzes: true },
+          });
+
+        const isOwningInstructor =
+          roleName === 'Instructor' &&
+          draftLesson?.course?.instructor?.id === user.id;
+
+        if (draftLesson && (canViewAnyDraft || isOwningInstructor)) {
+          if (draftLesson.course) delete draftLesson.course.instructor;
+          lesson = draftLesson;
+        }
+      }
 
       if (!lesson) {
         return ctx.notFound(
           'Lesson not found.'
         );
       }
-
-      const roleName = user.role?.name;
 
       if (roleName === 'Student') {
         const courseDocumentId = lesson.course?.documentId;

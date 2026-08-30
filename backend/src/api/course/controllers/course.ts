@@ -66,7 +66,8 @@ export default factories.createCoreController(
         allowDraft = draftCourse?.instructor?.id === user.id;
       }
 
-      ctx.query = { ...ctx.query, status: requestedDraft && allowDraft ? 'draft' : 'published' };
+      const resolvedStatus = requestedDraft && allowDraft ? 'draft' : 'published';
+      ctx.query = { ...ctx.query, status: resolvedStatus };
 
       const result = await super.findOne(ctx);
       if (!result?.data) return result;
@@ -75,7 +76,38 @@ export default factories.createCoreController(
         .query('api::enrollment.enrollment')
         .count({ where: { course: result.data.id } });
 
-      return { ...result, data: { ...result.data, enrollmentCount } };
+      // The public course page (frontend/src/app/courses/[id]/page.tsx) needs
+      // a lesson list — even for a guest who isn't logged in — so it can show
+      // the syllabus (title only, greyed out until enrolled) and let
+      // LessonList's own client-side access check unlock it after enrollment.
+      // super.findOne()'s own populate=* can't be relied on for this: Strapi
+      // silently drops a populated relation the requester's role doesn't have
+      // "find" permission for, and Lesson's find permission is deliberately
+      // NOT open to Public/Student, because that endpoint's response includes
+      // VideoURL/Content — the actual paid content, which must stay behind
+      // the enrollment check in lesson.ts's findOne(). Fetching the lessons
+      // here instead, through the Document Service directly, bypasses that
+      // REST permission layer entirely (the same pattern myCourses() above
+      // already uses) and only the safe title fields are attached below, so
+      // no Strapi Admin Panel permission change is needed for this.
+      const lessons = await strapi.documents('api::lesson.lesson').findMany({
+        status: resolvedStatus,
+        filters: { course: { documentId: { $eq: result.data.documentId } } },
+        fields: ['Title'],
+      });
+
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          enrollmentCount,
+          lessons: lessons.map((lesson: any) => ({
+            id: lesson.id,
+            documentId: lesson.documentId,
+            Title: lesson.Title,
+          })),
+        },
+      };
     },
 
     async create(ctx) {
