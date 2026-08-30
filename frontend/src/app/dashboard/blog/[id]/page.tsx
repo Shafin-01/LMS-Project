@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { authFetch, uploadImage } from "@/lib/auth";
+import { authFetch } from "@/lib/auth";
 import { toBlocks, blocksToText } from "@/lib/api";
 import RoleGuard from "@/components/RoleGuard";
 import { useToast } from "@/components/Toast";
@@ -17,9 +17,7 @@ function EditBlogPostForm({ postId }: { postId: string }) {
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
   const { showToast } = useToast();
 
@@ -48,25 +46,6 @@ function EditBlogPostForm({ postId }: { postId: string }) {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId]);
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    // Reset the input value so selecting the exact same file again still
-    // fires a change event (browsers otherwise treat it as a no-op).
-    e.target.value = "";
-    if (!file) return;
-
-    setUploading(true);
-    try {
-      const url = await uploadImage(file);
-      setCoverImageUrl(url);
-      showToast("Image uploaded.");
-    } catch (err: any) {
-      showToast(err.message || "Image upload failed.", "error");
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,56 +144,13 @@ function EditBlogPostForm({ postId }: { postId: string }) {
 
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">
-              Cover Image (optional)
+              Image URL (embed link, optional)
             </label>
-
-            {coverImageUrl && (
-              <div className="relative mb-3 h-40 w-full overflow-hidden rounded-lg border border-slate-700">
-                <img
-                  src={coverImageUrl}
-                  alt="Cover preview"
-                  className="h-full w-full object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => setCoverImageUrl("")}
-                  className="absolute top-2 right-2 rounded-full bg-slate-950/80 p-1.5 text-slate-300 transition-colors hover:text-white"
-                >
-                  <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                    <path
-                      fillRule="evenodd"
-                      d="M5.28 4.22a.75.75 0 00-1.06 1.06L8.94 10l-4.72 4.72a.75.75 0 101.06 1.06L10 11.06l4.72 4.72a.75.75 0 101.06-1.06L11.06 10l4.72-4.72a.75.75 0 00-1.06-1.06L10 8.94 5.28 4.22z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-              </div>
-            )}
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3.5 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800 disabled:opacity-50"
-              >
-                {uploading ? "Uploading..." : "Upload Image"}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <span className="text-xs text-slate-500">or paste a URL below</span>
-            </div>
-
             <input
               value={coverImageUrl}
               onChange={(e) => setCoverImageUrl(e.target.value)}
               placeholder="https://..."
-              className="mt-2 w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500"
             />
           </div>
 
