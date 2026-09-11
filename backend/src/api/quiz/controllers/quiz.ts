@@ -79,13 +79,7 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }) => 
 
     const lessonDocId = ctx.request.body?.data?.lesson;
 
-    // Only the Instructor branch used to check this, so an Admin/Content
-    // Manager request missing "lesson" (never sent by the shipped UI, but
-    // reachable via a direct API call) fell straight through to
-    // super.create() and silently created an orphan quiz attached to no
-    // lesson — it would never show up anywhere, but would sit in the
-    // database and inflate quiz counts. Requiring it up front closes that
-    // for every role, not just Instructor.
+    
     if (!lessonDocId) {
       return ctx.badRequest('A lesson must be provided for the quiz.');
     }
@@ -102,10 +96,6 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }) => 
 
     const response: any = await super.create(ctx);
 
-    // A quiz question has no separate Publish button in the UI — it's a
-    // small piece of sub-content inside a Lesson, not something that needs
-    // its own draft/publish workflow. So it's published immediately on
-    // creation, so a Student's submitQuiz() can pick it up right away.
     const documentId = response?.data?.documentId;
     if (documentId) {
       await strapi.documents('api::quiz.quiz').publish({ documentId });
@@ -138,10 +128,7 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }) => 
     }
 
     const response: any = await super.update(ctx);
-
-    // Published again after every update, otherwise an edited
-    // answer/question wouldn't be reflected in the published version, and a
-    // Student would keep seeing the old version.
+    
     const documentId = ctx.params.id;
     if (documentId) {
       await strapi.documents('api::quiz.quiz').publish({ documentId });

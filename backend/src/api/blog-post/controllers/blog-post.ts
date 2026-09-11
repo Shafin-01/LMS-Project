@@ -5,27 +5,12 @@ export default factories.createCoreController(
   'api::blog-post.blog-post',
   ({ strapi }) => ({
 
-    // find/findOne are overridden (instead of relying on the default core
-    // controller) purely to populate the "author" relation reliably.
-    // Strapi's default output sanitizer strips a populated relation to
-    // plugin::users-permissions.user for any role that lacks a "find"
-    // permission on Users — and the Public role intentionally does NOT have
-    // that permission (granting it would expose the full user list via
-    // /api/users). So we populate the author manually through the Document
-    // Service, which isn't subject to that same relation-stripping, and
-    // sanitize it ourselves so nothing sensitive leaks. This route has no
-    // login requirement at all, so sanitizePublicAuthor() is used here
-    // rather than the looser sanitizeUser() — see that function's comment
-    // for why (it was leaking the author's real email address to the
-    // public internet).
+    
     async find(ctx) {
       const user = ctx.state.user;
       const roleName = user?.role?.name;
       const canViewDrafts = roleName === 'Admin' || roleName === 'Content Manager';
 
-      // Only Admin/Content Manager may request draft posts (the dashboard's
-      // management page); everyone else always gets published-only results,
-      // regardless of what status query param they send.
       const requestedStatus = ctx.query?.status === 'draft' ? 'draft' : 'published';
       const status = canViewDrafts ? requestedStatus : 'published';
 
@@ -81,11 +66,7 @@ export default factories.createCoreController(
         return ctx.badRequest('Title is required.');
       }
 
-      // Bypassing super.create() — as we saw with Course/Lesson, leaving status
-      // unspecified causes super.create() to auto-publish, but calling the
-      // Document Service directly keeps it as a draft.
-      // The author field is set from the logged-in user rather than trusting
-      // the client, for security.
+
       const blogPost = await strapi.documents('api::blog-post.blog-post').create({
         data: {
           Title: requestData.Title,
@@ -112,9 +93,6 @@ export default factories.createCoreController(
       });
       if (!existingPost) return ctx.notFound('Blog post not found.');
 
-      // Whether this post is currently live BEFORE the edit — decides
-      // whether the edit below should also go live (see course.ts's
-      // update() for the full reasoning; same fix, same pattern).
       const publishedBeforeEdit = await strapi.documents('api::blog-post.blog-post').findOne({
         documentId: ctx.params.id,
         status: 'published',
@@ -126,15 +104,13 @@ export default factories.createCoreController(
       if (requestData.Body !== undefined) updateData.Body = requestData.Body;
       if (requestData.CoverImageURL !== undefined) updateData.CoverImageURL = requestData.CoverImageURL;
 
-      // Bypassing super.update() — same auto-publish fix as above
+      
       const updatedPost = await strapi.documents('api::blog-post.blog-post').update({
         documentId: ctx.params.id,
         data: updateData,
       });
 
-      // A post that was already published needs its live version kept in
-      // sync with the edit — otherwise a reader keeps seeing the old text
-      // even though the dashboard shows it as "Published".
+      
       if (publishedBeforeEdit) {
         await strapi.documents('api::blog-post.blog-post').publish({ documentId: ctx.params.id });
       }

@@ -1,9 +1,6 @@
 import { sanitizeUser } from '../../../utils/sanitize-user';
 
-// Only these four roles are part of the platform's actual role system.
-// Strapi's built-in "Public" and "Authenticated" roles exist for the
-// permissions plugin itself and are intentionally excluded from every
-// admin-facing role count, role list and role-change option.
+
 const MANAGED_ROLE_NAMES = ['Admin', 'Content Manager', 'Instructor', 'Student'];
 
 async function requireAdmin(ctx: any) {
@@ -28,19 +25,6 @@ export default {
   async stats(ctx: any) {
     const requester = await requireAdmin(ctx);
     if (!requester) return;
-
-    // Course/Lesson/Blog-post all have Draft & Publish enabled, which stores
-    // a draft row AND a published row for the same document once it has
-    // ever been published — two rows sharing one documentId. strapi.db.query
-    // is the raw table layer, so a plain .count() with no status filtering
-    // counts BOTH rows, silently doubling these three numbers for anything
-    // that's live (e.g. 2 real courses would show as "4"). Enrollment has
-    // Draft & Publish OFF, so it only ever has one row per enrollment and
-    // its raw count is already correct as-is.
-    // Every document always has exactly one draft row (drafting is the
-    // working copy that exists whether or not it's also published), so
-    // asking the Document Service for the draft rows gives the true,
-    // de-duplicated count of distinct courses/lessons/posts.
     const totalCourses = (
       await strapi.documents('api::course.course').findMany({ status: 'draft', fields: ['id'] })
     ).length;
@@ -77,8 +61,7 @@ export default {
     return { data: sanitized };
   },
 
-  // Only the platform's own roles (Public/Authenticated excluded), used to
-  // populate the "change role" dropdown.
+  // Only the platform's own roles (Public/Authenticated excluded), used to populate the "change role" dropdown.
   async listRoles(ctx: any) {
     const requester = await requireAdmin(ctx);
     if (!requester) return;
@@ -89,8 +72,7 @@ export default {
     return { data: filtered.map((r) => ({ id: r.id, name: r.name })) };
   },
 
-  // Change a user's role — an Admin cannot change their own role, so the
-  // platform can never end up with zero Admins by accident.
+  // Change a user's role — an Admin cannot change their own role, so the platform can never end up with zero Admins by accident.
   async updateUserRole(ctx: any) {
     const requester = await requireAdmin(ctx);
     if (!requester) return;
@@ -127,9 +109,7 @@ export default {
     return { data: sanitizeUser(updatedUser) };
   },
 
-  // Delete a user account — an Admin cannot delete their own account, for
-  // the same reason they cannot change their own role: the platform must
-  // always keep at least one Admin able to manage it.
+
   async deleteUser(ctx: any) {
     const requester = await requireAdmin(ctx);
     if (!requester) return;

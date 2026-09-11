@@ -84,24 +84,7 @@ export default factories.createCoreController(
       const roleName = user.role?.name;
       const canViewAnyDraft = roleName === 'Admin' || roleName === 'Content Manager';
 
-      // strapi.documents().findOne() defaults to the DRAFT row when no
-      // "status" is given — so without asking for 'published' explicitly
-      // here, an enrolled Student (or anyone who knows/guesses a lessonId)
-      // could read a lesson's Content/VideoURL before it was ever
-      // published, completely bypassing the Publish step. Only Admin/
-      // Content Manager (any lesson) or the Instructor who owns the
-      // lesson's course (previewing their own draft) may see the draft
-      // version; everyone else only ever gets the published one.
-      //
-      // "instructor" is populated one level under course on BOTH branches
-      // below, purely for the ownership check further down — it is deleted
-      // back off before the lesson is used any further, so it never reaches
-      // the response. The populate shape is written out on each call
-      // (rather than shared through one variable) because Strapi's
-      // generated types infer a precise literal-array type for populate
-      // only when the object is written directly at the call site;
-      // hoisting it into a shared variable loses that inference and fails
-      // to compile.
+      
       let lesson: any = await strapi
         .documents('api::lesson.lesson')
         .findOne({
@@ -134,12 +117,6 @@ export default factories.createCoreController(
         );
       }
 
-      // Every other action in this file (update/delete/publish/unpublish)
-      // restricts an Instructor to only their own courses' lessons — this
-      // was previously only enforced for the draft-preview branch above,
-      // leaving a gap where an Instructor could fetch ANY other
-      // instructor's already-published lesson (full Content/VideoURL, plus
-      // its quizzes) with no ownership check at all. Closing that here.
       if (roleName === 'Instructor' && lesson.course?.instructor?.id !== user.id) {
         return ctx.forbidden(
           'You can only view lessons in your own courses.'
@@ -173,10 +150,6 @@ export default factories.createCoreController(
         }
       }
 
-      // Strips the correct answer out of each quiz for a Student, so it can
-      // never leak. The quiz.ts controller already had this protection, but
-      // it was being bypassed here because this endpoint populates quizzes
-      // directly through the lesson — so the same protection is applied here too.
       const responseLesson: any = { ...lesson };
 
       if (roleName === 'Student' && Array.isArray(responseLesson.quizzes)) {

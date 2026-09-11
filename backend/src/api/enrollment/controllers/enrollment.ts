@@ -5,17 +5,7 @@ export default factories.createCoreController(
     'api::enrollment.enrollment',
     ({ strapi }) => {
 
-        // strapi.documents('api::lesson.lesson').findMany()/.findOne() default
-        // to the DRAFT row whenever "status" isn't specified — including when
-        // a lesson is only reached indirectly, by populating it through a
-        // course (e.g. course: { populate: { lessons: true } } below). Left
-        // alone, that means every lesson/progress count in this file — total
-        // lesson count, completed count, percentage — would be computed off
-        // whatever an Instructor has mid-edited but not yet published, not
-        // off what a Student can actually see and complete. This helper is
-        // the one place that asks for the real, published lesson list for a
-        // course, so every function below can replace a populated (draft-
-        // defaulting) course.lessons with this instead of trusting it as-is.
+
         const getPublishedLessons = async (courseDocumentId: string) => {
             if (!courseDocumentId) return [];
             const lessons = await strapi.documents('api::lesson.lesson').findMany({
@@ -30,16 +20,7 @@ export default factories.createCoreController(
             }));
         };
 
-        // The same draft-defaulting problem getPublishedLessons() exists for
-        // applies to the course object itself, not just its lessons — every
-        // "course" populated below through an enrollment comes back as
-        // whatever an Instructor has mid-edited (Title/Description included),
-        // not the published version a Student actually sees on the public
-        // course page. Without this, a Title edited-but-not-republished would
-        // show correctly on /courses/:id (which explicitly asks for
-        // status:'published') but show the stale/unpublished edit on My
-        // Courses and the homepage's "Continue Learning" — two different
-        // titles for the same course, open in the same session.
+        
         const withPublishedCourseData = async (course: any) => {
             if (!course) return course;
             const [publishedInfo, lessons] = await Promise.all([
@@ -403,9 +384,7 @@ export default factories.createCoreController(
                 (item: any) => item.documentId && courseLessonDocumentIds.has(item.documentId)
             ).length;
 
-            // A course with zero lessons has nothing left to finish, so it
-            // counts as 100% complete rather than 0% — otherwise a Student
-            // would be stuck at "0% complete" forever with no lesson to mark.
+  
             const percentage =
                 totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 100;
 
@@ -415,11 +394,7 @@ export default factories.createCoreController(
             };
         },
 
-        /**
-         * Progress for a specific enrollment.
-         * A student can view only their own, Admin/Content Manager can view any,
-         * an Instructor can view only their own course's.
-         */
+        
         async getProgress(ctx) {
             const user = ctx.state.user;
 
@@ -484,15 +459,8 @@ export default factories.createCoreController(
                         courseLessonDocumentIds.has(completedLesson.documentId)
                 ).length;
 
-            // A course with zero lessons has nothing left to finish, so it
-            // counts as 100% complete rather than 0% — otherwise a Student
-            // would be stuck at "0% complete" forever with no lesson to mark.
             const percentage =
                 totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 100;
-
-            // The frontend's MarkCompleteButton needs to know exactly which
-            // lessons are completed (not just a count) so it can correctly
-            // show "Completed" for a specific lesson after a page refresh.
             const completedLessonsList = (enrollment.completedLessons || [])
                 .filter(
                     (completedLesson: any) =>
@@ -571,8 +539,6 @@ export default factories.createCoreController(
                     (item: any) => item.documentId && courseLessonDocumentIds.has(item.documentId)
                 ).length;
 
-                // Same zero-lessons-means-100%-complete rule as everywhere
-                // else, so this list matches what the student themself sees.
                 const percentage =
                     totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 100;
 
